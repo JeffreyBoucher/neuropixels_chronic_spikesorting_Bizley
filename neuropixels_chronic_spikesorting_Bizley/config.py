@@ -13,3 +13,7 @@ bhv_fs = 24414.062500
 np_fs = 30000 ### could alternatively be taken per meta file.
 
 
+###### SECTION FOR BUG FIX FLAGS
+
+
+useBugFixedSilencePeriods = False

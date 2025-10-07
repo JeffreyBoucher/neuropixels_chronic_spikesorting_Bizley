@@ -4,7 +4,8 @@ import spikeinterface.full as si
 import matplotlib.pyplot as plt
 import spikeinterface.widgets as sw
 
-
+import neuropixels_chronic_spikesorting_Bizley.externalBugFixes.spike_interface.v_103_0.silence_periods as silence_periods_file
+import neuropixels_chronic_spikesorting_Bizley.config as global_configs
 import torch
 import pickle
 
@@ -101,14 +102,19 @@ def spikeglx_preprocessing(recording,doRemoveBadChannels =1,skipStuffThatKSGUIDo
         recording = si.common_reference(recording, reference='global',operator='median')  # common reference, I think it's much better to do this after removing bad channels. IBL does a spatial highpass with very low cutoff, butI will keep median for now.
     recording = recording.astype(dtype="float32")
     if windowsToSilenceArray.any():  # code breaks when no saturation
-
-        recording = si.silence_periods(recording, windowsToSilenceArray, mode="noise") # Doing this before whitening might cause issues... I need to understand how whitening works better.
+        if global_configs.useBugFixedSilencePeriods:
+            recording = silence_periods_file.silence_periods(recording, windowsToSilenceArray, mode="noise")
+        else:
+            recording = si.silence_periods(recording, windowsToSilenceArray, mode="noise") # Doing this before whitening might cause issues... I need to understand how whitening works better.
         # recording = recording.astype('int16') ### reportedly converting back in this way is dangerous, and I should look into it. I need to do it for harddrive space, but otherwise I shouldn't bother.
     if addNoiseForMotionCorrection:
         pad_size, pad_bounds = size_pad_to_add(recording,bin_s_sessionCat)
         padRecording = recording.frame_slice(0,pad_size)
         recording = si.concatenate_recordings([recording, padRecording])
-        recording = si.silence_periods(recording, [[pad_bounds[0],recording.get_num_frames()]], mode="noise")
+        if global_configs.useBugFixedSilencePeriods:
+            recording = silence_periods_file.silence_periods(recording, [[pad_bounds[0],recording.get_num_frames()]], mode="noise")
+        else:
+            recording = si.silence_periods(recording, [[pad_bounds[0],recording.get_num_frames()]], mode="noise")
     # spikeglx_visualize(recording)
     return recording
 

@@ -46,4 +46,17 @@ line in the yml file... This assumes I will have gotten 103 working. If this doe
 ideally, this would be where many of the key file locations would be adjusted, and mostly we do a good job at this.
 import config to get them. This will also include, for example, the tdt sample rate. 
 
+## bug fixes for external packages
+
+The best possible way to deal with them is to have your fixed function be called instead of theirs, and
+keep that function in your own repository. I will try to do that, but in some cases the bugs will be too
+low level for that to be reasonable. A somewhat tolerable alternative is to save the adjusted files in
+a special folder and give direction (right here) on where to copy-paste them. So, that's the plan. The version
+from which the adjustment was made will be specified by the folder we put it in. 
+
+## list of files to move and where
+
+    - .\neuropixels_chronic_spikesorting_Bizley\externalBugFixes\spike_interface\v_103.0\silence_periods.py
+
+        -from your external packages folder, replace \spikeinterface\preprocessing\silence_periods.py
 
