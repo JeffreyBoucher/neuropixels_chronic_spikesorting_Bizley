@@ -1,0 +1,35 @@
+name: si_env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - numpy
+  - scipy
+  - joblib
+  - tqdm
+  - matplotlib
+  - h5py
+  - pandas
+  - xarray
+  - zarr
+  - scikit-learn
+  - hdbscan
+  - networkx
+  - pybind11
+  - loky
+  - numba
+  - jupyter
+  - pyqt=5
+  - pyqtgraph
+  - ipywidgets
+  - ipympl
+  - pip:
+    - ephyviewer
+    - MEArec
+    - spikeinterface[full,widgets]
+    - spikeinterface-gui
+    - tridesclous
+     # you need to install kilosort as a seperate command for some reason, or it won't work. pip install kilosort --upgrade
+    # - phy==2.0b5
