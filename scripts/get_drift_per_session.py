@@ -30,21 +30,21 @@ def main():
         recordingZone = 'PFC_shank0_Challah'
         #recordingZone = 'PFC_shank3_Challah'
         #recordingZone = "ACx_Challah"
-        frequencyOfConcatenation = 'weekly_heuristic'#'do_everything' #'weekly_heuristic' or 'do_everything'. do_everything is contained per probemap.
+        frequencyOfConcatenation = 'do_everything' #'weekly_heuristic' or 'do_everything'. do_everything is contained per probemap.
         output_folder = Path('D:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Output')
         sessionsToDo = 'all'
     if True: # contains si arguments. Likely to be nonspecific.
         desired_n_jobs = 16
-        bin_s_sessionCat = 60.0
+        bin_s_sessionCat = 6.0 # 6 is best. It is the only way I've managed to get something that looks good.
         si.set_global_job_kwargs(n_jobs=desired_n_jobs)
         doRemoveBadChannels = 1  # currently uses the manual list...
         skipStuffThatKSGUIDoes = 0  # KS GUI does CAR and bandpass filter and it is a bit opaque how to turn off the latter.
 
     if True: # arguments handling how much code to run
         doPreprocessing = 1 # if you want to load your drift maps without recalculating them, turn this off.
-        savePreprocessing = 0
+        savePreprocessing = 1
         overwritePreprocessing = 0
-        checkMotionPlotsOnline = 1 # turn this off if you don't want to view the plots.
+        checkMotionPlotsOnline = 0 # turn this off if you don't want to view the plots.
         calculateSessionMotionDisplacement = 1 # will probably never be turned off, since this is the whole point of the code.
         if not doPreprocessing:
             print('warning: not doing any preprocessing.')
@@ -239,7 +239,7 @@ def main():
                 # recording = si.read_cbin_ibl(probeFolder)  # for compressed
                 local_probeFolder = Path('C:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Inputs') / Path(*probeFolder.parts[1:])
                 recording = si.read_spikeglx(probeFolder, stream_id=stream_id) # for uncompressed
-                recording = spikeglx_preprocessing(recording, doRemoveBadChannels=doRemoveBadChannels,skipStuffThatKSGUIDoes=skipStuffThatKSGUIDoes,local_probeFolder=local_probeFolder,badChannelList=badChannelList, addNoiseForMotionCorrection=1,bin_s_sessionCat=bin_s_sessionCat)
+                recording = spikeglx_preprocessing(recording, doRemoveBadChannels=doRemoveBadChannels,skipStuffThatKSGUIDoes=skipStuffThatKSGUIDoes,local_probeFolder=local_probeFolder,badChannelList=badChannelList, addNoiseForMotionCorrection=0,bin_s_sessionCat=bin_s_sessionCat)
                 ### do things related to the construction of a file which stores the recording information.
                 multirec_info['name'].append(session_name)
                 multirec_info['fs'].append(recording.get_sampling_frequency())
