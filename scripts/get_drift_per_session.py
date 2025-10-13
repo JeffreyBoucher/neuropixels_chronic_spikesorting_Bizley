@@ -34,17 +34,17 @@ def main():
         output_folder = Path('D:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Output')
         sessionsToDo = 'all'
     if True: # contains si arguments. Likely to be nonspecific.
-        desired_n_jobs = 16
+        desired_n_jobs = 1
         bin_s_sessionCat = 6.0 # 6 is best. It is the only way I've managed to get something that looks good.
         si.set_global_job_kwargs(n_jobs=desired_n_jobs)
         doRemoveBadChannels = 1  # currently uses the manual list...
         skipStuffThatKSGUIDoes = 0  # KS GUI does CAR and bandpass filter and it is a bit opaque how to turn off the latter.
 
     if True: # arguments handling how much code to run
-        doPreprocessing = 1 # if you want to load your drift maps without recalculating them, turn this off.
-        savePreprocessing = 1
+        doPreprocessing = 0 # if you want to load your drift maps without recalculating them, turn this off.
+        savePreprocessing = 0
         overwritePreprocessing = 0
-        checkMotionPlotsOnline = 0 # turn this off if you don't want to view the plots.
+        checkMotionPlotsOnline = 1 # turn this off if you don't want to view the plots.
         calculateSessionMotionDisplacement = 1 # will probably never be turned off, since this is the whole point of the code.
         if not doPreprocessing:
             print('warning: not doing any preprocessing.')
@@ -60,7 +60,7 @@ def main():
             ferret = 'F2302_Challah'
         elif recordingZone == 'PFC_shank0_Challah':
             stream_id = 'imec1.ap'
-            sessionSetLabel = 'PFC_shank0'
+            sessionSetLabel = 'PFC_shank0_MonthOfMay2024'#'PFC_shank0'
             channel_map_to_use = 'Challah_top_PFC_shank0.imro'
             badChannelList = [21,109,133,170,181,202,295,305,308,310,327,329,339]
             # something else also. Need to read metadata
@@ -105,6 +105,8 @@ def main():
             sessionString = '1305*'
         elif sessionSetLabel == 'TheFirstSession':
             sessionString = '1305*AM*'
+        elif 'MonthOfMay2024' in sessionSetLabel:
+            sessionString = '[0-9][0-9]052024*'
         else:
             sessionString = '[0-9][0-9]*'
     session_path = Path('Z:/Data/Neuropixels/' + ferret)  # path to where all relevant sessions are stored
@@ -183,7 +185,7 @@ def main():
         dict_of_recordings = {}
         sessionLoopBreakFlag = False
         sessionsWithinMap = []
-        for i,session in enumerate(currentSetOfSessions):
+        for i,session in enumerate(currentSetOfSessions[0:400]):
             session_name = session.name
             if (frequencyOfConcatenation == 'weekly_heuristic') & (not i):
                 sessionSetName = 'weekOf' + session_name[4:8] + session_name[2:4] + session_name[0:2]  # name after first day of week. Also, swap to year month day so that things are alphabetical
@@ -191,13 +193,14 @@ def main():
                 sessionSetName = session_name
             print(f'Processing {sessionSetName}')
             dp = session_path / session_name
-            chan_dict = get_channelmap_names(dp)  # almost works but something about the format is different. no "imRoFile" perameter. There is something called an "imRoTable" which is probably also what I want. But let's deal with this later, when we know we need it. Because, honestly, we want something more sophisticated than this eventually.
+            chan_dict = get_channelmap_names(dp)
             if (session_name + "_" + stream_id[:-3]) in chan_dict:
                 if any(v == channel_map_to_use for v in chan_dict.values()):
                     sessionsWithinMap.append(session)
             else:
                 print('a bug you should solve')
                 pass
+
         if any(sessionsWithinMap):
             setsOfSessionsPerGrouping.append(sessionsWithinMap)
     for sessionSetCount,currentSetOfSessions in enumerate(setsOfSessionsPerGrouping): #with weekly heuristic, each current set of session is a list of path objects
@@ -338,8 +341,8 @@ def main():
             rec_corrected = rec_corrected_nonWhitened.astype('int16')
             rec_corrected = si.whiten(recording=rec_corrected, int_scale=200)
             peak_locations_after = sm.correct_motion_on_peaks(peaks, peak_locations, motion, rec_corrected)
-            multirecordingInput = multirecordingInput.astype('int16')
-            whitened_recording = si.whiten(recording=multirecordingInput, int_scale=200)
+            #multirecordingInput = multirecordingInput.astype('int16')
+            whitened_recording = si.whiten(recording=multirecordingInput.astype('int16'), int_scale=200)
 
             if False: # plotting functions. Will probably extract them otherwise.
             ### see below the length I need to go to to plot the peak locations as a function of space and time...

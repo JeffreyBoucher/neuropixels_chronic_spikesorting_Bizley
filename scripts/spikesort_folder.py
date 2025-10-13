@@ -24,12 +24,13 @@ def main():
         #recordingZone = 'PFC_Boule_Borders_Top'
         recordingZone = 'PFC_shank0_Challah'
         #recordingZone = 'PFC_shank3_Challah'
+        #recordingZone = 'PFC_shank3_Challah_bottom'
         #recordingZone = "ACx_Challah"
         output_folder = Path('D:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Output')
-        sessionsToDo = 'all'
+        sessionsToDo = 'all' # vestige from get_drift_per_session
 
     if True: # contains si arguments
-        desired_n_jobs = 16
+        desired_n_jobs = 1
         si.set_global_job_kwargs(n_jobs=desired_n_jobs)
         doRemoveBadChannels = 1  # set as 1 if you are sorting, set as 0 if you want to save a thing for the ks4 gui or something
         skipStuffThatKSGUIDoes = 0 # even still we don't want to do this, I think, because of the noise estimation.
@@ -45,7 +46,7 @@ def main():
     if not doSpikeSorting:
         print('warning: not doing any spikesorting. Doing postprocessing instead')
 
-    if True: # contains probemap specific stuff. Highly specific to my project.
+    if True: # contains probemap specific stuff. Highly specific to my project. I certainly will functionalize this soon so I can use it in both this and the drift correction script.
         if recordingZone == 'ACx_Challah':
             stream_id = 'imec0.ap'
             sessionSetLabel = 'All_ACx_Top'
@@ -55,16 +56,24 @@ def main():
             ferret = 'F2302_Challah'
         elif recordingZone == 'PFC_shank0_Challah':
             stream_id = 'imec1.ap'
-            sessionSetLabel = 'PFC_shank0'
+            #sessionSetLabel = 'PFC_shank0'
+            sessionSetLabel = 'PFC_shank0_July2024'
             channel_map_to_use = 'Challah_top_PFC_shank0.imro'
             badChannelList = [21,109,133,170,181,202,295,305,308,310,327,329,339]
-            # something else also. Need to read metadata
+            # something else also. Need to read metadata ### I don't know what I meant by this and it doesn't seem to be true
             ferret = 'F2302_Challah'
         elif recordingZone == 'PFC_shank3_Challah':
             stream_id = 'imec1.ap'
             sessionSetLabel = 'PFC_shank3'
             channel_map_to_use = 'Challah_top_PFC_shank3.imro'
             badChannelList = [21,109,133,170,181,202,295,305,308,310,327,329,339]
+            # something else also. Need to read metadata
+            ferret = 'F2302_Challah'
+        elif recordingZone == 'PFC_shank3_Challah_bottom':
+            stream_id = 'imec1.ap'
+            sessionSetLabel = 'PFC_shank3_bottom'
+            channel_map_to_use = 'Challah_bottom_PFC_shank3_tip_ref.imro'
+            badChannelList = [21,109,133,170,181,202,295,305,308,310,327,329,339] ### I double checked, this is still exactly right a year later.
             # something else also. Need to read metadata
             ferret = 'F2302_Challah'
         elif recordingZone == 'ACx_Boule':
@@ -91,6 +100,7 @@ def main():
             badChannelList = [19, 128, 161, 291, 315]
             # channel_map_to_use_other_ref = ''
             ferret = 'F2301_Boule'
+
     if True: # manages the highest-level selection of sessions via regex. A bit outdated now that session-sets are implemented.
         if sessionSetLabel == 'All_ACx_Top':
             sessionString = '[0-9][0-9]*' ### this actually selects more than just the top
@@ -100,6 +110,8 @@ def main():
             sessionString = '1305*'
         elif sessionSetLabel == 'TheFirstSession':
             sessionString = '1305*AM*'
+        elif 'July2024' in sessionSetLabel:
+            sessionString = '[0-9][0-9]072024*'
         else:
             sessionString = '[0-9][0-9]*'
     session_path = Path('Z:/Data/Neuropixels/' + ferret)
@@ -107,7 +119,7 @@ def main():
     sessionSetName = 'everythingAllAtOnce'
 
     sessionsWithinMap = []
-    for i,session in enumerate(SessionsInOrder):
+    for i,session in enumerate(SessionsInOrder[0:400]):
         session_name = session.name
         dp = session_path / session_name
         chan_dict = get_channelmap_names(dp)  # almost works but something about the format is different. no "imRoFile" perameter. There is something called an "imRoTable" which is probably also what I want. But let's deal with this later, when we know we need it. Because, honestly, we want something more sophisticated than this eventually.
