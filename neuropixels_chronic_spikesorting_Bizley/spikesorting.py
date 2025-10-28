@@ -51,9 +51,14 @@ def spikeglx_preprocessing(recording,doRemoveBadChannels =1,skipStuffThatKSGUIDo
     if not skipStuffThatKSGUIDoes: # I actually might move this to after the concatenation?
         recording = si.bandpass_filter(recording, freq_min=300, freq_max=6000) # filter each
         if False: # here I do peak detection and localization early because it is quicker with one session... I do this to test a processing method.
-            recording_preCMR = recording
+            ### make a subselection of the recording so you can do this faster
+            low_bound_temp = int(round(960*30000))
+            high_bound_temp = int(round(975*30000))
+            recording_preCMR = recording.frame_slice(low_bound_temp,high_bound_temp)
             recording_CMR = si.common_reference(recording_preCMR, reference='global', operator='median')
-            recording_localRef = si.common_reference(recording_preCMR, reference='local', operator='median',local_radius=(60,200)) ### I don't know if local radius is in units of channels or microns.
+            si.highpass_spatial_filter(recording)
+            #recording_localRef = si.common_reference(recording_preCMR, reference='local', operator='median',local_radius=(60,200)) ### I don't know if local radius is in units of channels or microns.
+            recording_localRef = si.highpass_spatial_filter(recording_preCMR)
             desired_n_jobs = 16
             from spikeinterface.sortingcomponents.peak_detection import detect_peaks
             from spikeinterface.sortingcomponents.peak_selection import select_peaks

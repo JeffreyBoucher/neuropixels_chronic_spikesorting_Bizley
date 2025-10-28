@@ -27,33 +27,33 @@ def main():
 
         #recordingZone = 'PFC_Boule_Borders_Top_GroundrefIThink'
         #recordingZone = 'PFC_Boule_Borders_Top'
-        recordingZone = 'PFC_shank0_Challah'
+        #recordingZone = 'PFC_shank0_Challah'
         #recordingZone = 'PFC_shank3_Challah'
-        #recordingZone = "ACx_Challah"
+        recordingZone = "ACx_Challah_top_groundref"
         frequencyOfConcatenation = 'do_everything' #'weekly_heuristic' or 'do_everything'. do_everything is contained per probemap.
         output_folder = Path('D:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Output')
         sessionsToDo = 'all'
     if True: # contains si arguments. Likely to be nonspecific.
-        desired_n_jobs = 1
+        desired_n_jobs = 16
         bin_s_sessionCat = 6.0 # 6 is best. It is the only way I've managed to get something that looks good.
         si.set_global_job_kwargs(n_jobs=desired_n_jobs)
         doRemoveBadChannels = 1  # currently uses the manual list...
         skipStuffThatKSGUIDoes = 0  # KS GUI does CAR and bandpass filter and it is a bit opaque how to turn off the latter.
 
     if True: # arguments handling how much code to run
-        doPreprocessing = 0 # if you want to load your drift maps without recalculating them, turn this off.
-        savePreprocessing = 0
+        doPreprocessing = 1 # if you want to load your drift maps without recalculating them, turn this off.
+        savePreprocessing = 1
         overwritePreprocessing = 0
-        checkMotionPlotsOnline = 1 # turn this off if you don't want to view the plots.
+        checkMotionPlotsOnline = 0 # turn this off if you don't want to view the plots.
         calculateSessionMotionDisplacement = 1 # will probably never be turned off, since this is the whole point of the code.
         if not doPreprocessing:
             print('warning: not doing any preprocessing.')
 
 
     if True: # contains probemap specific stuff. Highly specific to my project.
-        if recordingZone == 'ACx_Challah':
+        if recordingZone == 'ACx_Challah_top_groundref':
             stream_id = 'imec0.ap'
-            sessionSetLabel = 'All_ACx_Top'
+            sessionSetLabel = 'All_ACx_Top_groundref'
             channel_map_to_use = 'Challah_top_b1_horizontal_band_ground.imro'
             #channel_map_to_use_other_ref = 'Challah_top_b1_horizontal_band_joint_tip.imro' ### this wouldn't actually work...
             badChannelList = [66,105,149,170,175,209,210,239,354,369]
@@ -185,7 +185,7 @@ def main():
         dict_of_recordings = {}
         sessionLoopBreakFlag = False
         sessionsWithinMap = []
-        for i,session in enumerate(currentSetOfSessions[0:400]):
+        for i,session in enumerate(currentSetOfSessions):
             session_name = session.name
             if (frequencyOfConcatenation == 'weekly_heuristic') & (not i):
                 sessionSetName = 'weekOf' + session_name[4:8] + session_name[2:4] + session_name[0:2]  # name after first day of week. Also, swap to year month day so that things are alphabetical
