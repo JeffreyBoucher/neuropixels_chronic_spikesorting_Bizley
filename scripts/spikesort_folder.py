@@ -30,7 +30,7 @@ def main():
         sessionsToDo = 'all' # vestige from get_drift_per_session
 
     if True: # contains si arguments
-        desired_n_jobs = 1
+        desired_n_jobs = 16
         si.set_global_job_kwargs(n_jobs=desired_n_jobs)
         doRemoveBadChannels = 1  # set as 1 if you are sorting, set as 0 if you want to save a thing for the ks4 gui or something
         skipStuffThatKSGUIDoes = 0 # even still we don't want to do this, I think, because of the noise estimation.
@@ -38,7 +38,7 @@ def main():
     if True: # arguments handling how much code to run
         skipStuffThatKSGUIDoes = 0  # KS GUI does CAR and bandpass filter and it is a bit opaque how to turn off the latter.
 
-
+        whitenManually = 0
         skipSessionsAlreadyDone = 1
         doSpikeSorting = 1 # covers both preprocessing and spikesorting in this case.
         doPostprocessing = 0 # shouldn't need to by current plans
@@ -57,7 +57,7 @@ def main():
         elif recordingZone == 'PFC_shank0_Challah':
             stream_id = 'imec1.ap'
             #sessionSetLabel = 'PFC_shank0'
-            sessionSetLabel = 'PFC_shank0_July2024'
+            sessionSetLabel = 'PFC_shank0'
             channel_map_to_use = 'Challah_top_PFC_shank0.imro'
             badChannelList = [21,109,133,170,181,202,295,305,308,310,327,329,339]
             # something else also. Need to read metadata ### I don't know what I meant by this and it doesn't seem to be true
@@ -213,8 +213,11 @@ def main():
         output_folder_sorted = output_folder / 'spikesorted' / ferret / recordingZone / sessionSetLabel / sessionSetName / session_name
         phy_folder = output_folder_sorted / 'KiloSortSortingExtractor' / 'phy_folder'  # probably.
         phy_folder.mkdir(parents=True, exist_ok=True)
-
-        whitened_recording = si.whiten(recording=multirecordingInput,dtype="float32") # I stopped trying to force this to be intscaled to 200 because it never friggin worked. Something I can consider is doing a few of the preprocessing steps within kilosort so that I don't run into an issue here...
+        if whitenManually:
+            whitened_recording = si.whiten(recording=multirecordingInput,dtype="float32") # I stopped trying to force this to be intscaled to 200 because it never friggin worked. Something I can consider is doing a few of the preprocessing steps within kilosort so that I don't run into an issue here...
+            usedRecording = whitened_recording
+        else:
+            usedRecording = multirecordingInput
         if skipSessionsAlreadyDone:
             if (output_folder_temp / Path("tempDir")).is_dir():
                 continue
@@ -226,8 +229,7 @@ def main():
         #try:
         if doSpikeSorting:
             sorting = spikesorting_pipeline(
-                whitened_recording,
-                #multirecordingInput,
+                usedRecording,
                 output_folder=output_folder_temp,
                 sorter='kilosort4',
                 concatenated=True
