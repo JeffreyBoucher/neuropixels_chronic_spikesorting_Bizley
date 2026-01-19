@@ -15,6 +15,8 @@ from spikeinterface.sortingcomponents.peak_selection import select_peaks
 from spikeinterface.sortingcomponents.peak_localization import localize_peaks
 from spikeinterface.sortingcomponents.motion import estimate_motion, interpolate_motion
 
+import neuropixels_chronic_spikesorting_Bizley.outerLoopConfigs as outerLoopConfigs
+
 
 from neuropixels_chronic_spikesorting_Bizley.helpers.helpers_spikesorting_scripts import sort_np_sessions, get_channelmap_names
 from neuropixels_chronic_spikesorting_Bizley.spikesorting import spikesorting_pipeline, spikesorting_postprocessing, spikeglx_preprocessing
@@ -31,7 +33,8 @@ def main():
         #recordingZone = 'PFC_shank3_Challah'
         recordingZone = "ACx_Challah_top_groundref"
         frequencyOfConcatenation = 'do_everything' #'weekly_heuristic' or 'do_everything'. do_everything is contained per probemap.
-        output_folder = Path('D:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Output')
+        #output_folder = Path('D:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Output')
+        output_folder = Path('C:/Jeffrey/InstrumentsProject/SessionDriftOutput')
         sessionsToDo = 'all'
     if True: # contains si arguments. Likely to be nonspecific.
         desired_n_jobs = 16
@@ -39,13 +42,23 @@ def main():
         si.set_global_job_kwargs(n_jobs=desired_n_jobs)
         doRemoveBadChannels = 1  # currently uses the manual list...
         skipStuffThatKSGUIDoes = 0  # KS GUI does CAR and bandpass filter and it is a bit opaque how to turn off the latter.
-
+        silenceOrNoiseReplace = 'zeros' ### Though I worry about this for actual spikesorting... For this specific application this is faster and better, I hope. ### use "zeros" or "noise"
+        if silenceOrNoiseReplace == 'silence': silenceOrNoiseReplace = 'zeros' # foolproofing
     if True: # arguments handling how much code to run
-        doPreprocessing = 1 # if you want to load your drift maps without recalculating them, turn this off.
+        doPreprocessing = 0 # if you want to load your drift maps without recalculating them, turn this off.
         savePreprocessing = 1
-        overwritePreprocessing = 0
-        checkMotionPlotsOnline = 0 # turn this off if you don't want to view the plots.
+        overwritePreprocessing = 1
+        resaveMotionIfLoadingPreprocessing = 1 # if you turn off preprocessing, you can either resave new motion correction stuff or not. Kapt off my default for safety.
+        checkMotionPlotsOnline = 1 # turn this off if you don't want to view the plots.
         calculateSessionMotionDisplacement = 1 # will probably never be turned off, since this is the whole point of the code.
+        testingThings = 0
+        if testingThings:
+            print('WARNING WARNING TESTING TESTING')
+            print('WARNING WARNING TESTING TESTING')
+            print('WARNING WARNING TESTING TESTING')
+            print('WARNING WARNING TESTING TESTING')
+            print('WARNING WARNING TESTING TESTING')
+            print('WARNING WARNING TESTING TESTING')
         if not doPreprocessing:
             print('warning: not doing any preprocessing.')
 
@@ -53,11 +66,12 @@ def main():
     if True: # contains probemap specific stuff. Highly specific to my project.
         if recordingZone == 'ACx_Challah_top_groundref':
             stream_id = 'imec0.ap'
-            sessionSetLabel = 'All_ACx_Top_groundref'
+            sessionSetLabel = 'All_ACx_Top_groundref_MonthOfMay2024'
             channel_map_to_use = 'Challah_top_b1_horizontal_band_ground.imro'
             #channel_map_to_use_other_ref = 'Challah_top_b1_horizontal_band_joint_tip.imro' ### this wouldn't actually work...
             badChannelList = [66,105,149,170,175,209,210,239,354,369]
             ferret = 'F2302_Challah'
+            doMultipleShanks = True
         elif recordingZone == 'PFC_shank0_Challah':
             stream_id = 'imec1.ap'
             sessionSetLabel = 'PFC_shank0_MonthOfMay2024'#'PFC_shank0'
@@ -65,6 +79,7 @@ def main():
             badChannelList = [21,109,133,170,181,202,295,305,308,310,327,329,339]
             # something else also. Need to read metadata
             ferret = 'F2302_Challah'
+            doMultipleShanks = False
         elif recordingZone == 'PFC_shank3_Challah':
             stream_id = 'imec1.ap'
             sessionSetLabel = 'PFC_shank3'
@@ -72,6 +87,7 @@ def main():
             badChannelList = [21,109,133,170,181,202,295,305,308,310,327,329,339]
             # something else also. Need to read metadata
             ferret = 'F2302_Challah'
+            doMultipleShanks = False
         elif recordingZone == 'ACx_Boule':
             stream_id = 'imec1.ap'
             sessionSetLabel = 'All_ACx_Top'
@@ -242,7 +258,7 @@ def main():
                 # recording = si.read_cbin_ibl(probeFolder)  # for compressed
                 local_probeFolder = Path('C:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Inputs') / Path(*probeFolder.parts[1:])
                 recording = si.read_spikeglx(probeFolder, stream_id=stream_id) # for uncompressed
-                recording = spikeglx_preprocessing(recording, doRemoveBadChannels=doRemoveBadChannels,skipStuffThatKSGUIDoes=skipStuffThatKSGUIDoes,local_probeFolder=local_probeFolder,badChannelList=badChannelList, addNoiseForMotionCorrection=0,bin_s_sessionCat=bin_s_sessionCat)
+                recording = spikeglx_preprocessing(recording, doRemoveBadChannels=doRemoveBadChannels,skipStuffThatKSGUIDoes=skipStuffThatKSGUIDoes,local_probeFolder=local_probeFolder,badChannelList=badChannelList, addNoiseForMotionCorrection=0,bin_s_sessionCat=bin_s_sessionCat,silenceOrNoiseReplace=silenceOrNoiseReplace)
                 ### do things related to the construction of a file which stores the recording information.
                 multirec_info['name'].append(session_name)
                 multirec_info['fs'].append(recording.get_sampling_frequency())
@@ -296,245 +312,514 @@ def main():
         ### save multirec_info
         phy_folder.mkdir(parents=True, exist_ok=True)
         #multirecordingInput = multirecordingInput.remove_channels(badChannelList)
-        if doPreprocessing:
-            ### recent stuff to hide with ifs later
-            ### motion correction
 
-            job_kwargs = dict(chunk_duration='1s',n_jobs=desired_n_jobs,progress_bar=True) #,
-            ### KS defaults, which I am using
-            peaks = detect_peaks(recording=multirecordingInput, method="locally_exclusive", peak_sign="neg",
-                                 detect_threshold=8.0, exclude_sweep_ms=0.1, radius_um=50,
-                                 **job_kwargs)  # seems like there isn't a unique peak detection algorithm for ks? I don't actually think that's true, I believe they use templates... But with SI, maybe not. I should maybe just look into the high level function and see what is done
-            peak_locations = localize_peaks(recording=multirecordingInput, peaks=peaks, method="grid_convolution",
-                                            weight_method={"mode": "gaussian_2d",
-                                                           "sigma_list_um": np.linspace(5, 25, 5)}, **job_kwargs)
-            if False: # contains defaults for other stuff
-                #### commented out: DREDGE defaults
-                peaks = detect_peaks(recording=multirecordingInput, method="locally_exclusive",peak_sign="neg",detect_threshold=8.0,exclude_sweep_ms=0.8,radius_um=80.0, **job_kwargs) #
-                peak_locations = localize_peaks(recording=multirecordingInput, peaks=peaks, method="monopolar_triangulation", **job_kwargs)
-                ### DREDGE MOTION
-                motion = estimate_motion(recording=pickleJar["multirecordingInput"], peaks=peaks,
-                                         peak_locations=peak_locations, method="dredge_ap", direction="y",
-                                         rigid=False, win_step_um=400.0, win_scale_um=400.0, win_margin_um=None, bin_s=30,
-                                         time_horizon_s=100) ### this is all mostly default DREDGE, but the time horizon is new. On my test case it works passably on my first two sessions, then completely fails to capture the third day for unknown reasons.
-                rec_corrected = interpolate_motion(recording=whitened_recording,motion=motion,border_mode="remove_channels",spatial_interpolation_method="kriging",sigma_um=30.)
+        if doMultipleShanks: ### still need to decide exactly how to do this, but my plan is to do multiple runs of the main plan.
+            if doPreprocessing: # loading and processing are pretty well split this time, the result of the load will be in a different format. Plotting will be load-relegated, drift saving will be here (maybe later, both)
+            ### first split shanks.
+                for ixi,currentRecording in enumerate(multirecordingInput.recording_list): ### malheurusement I need to do my shank splitting on each session pre-concatenation... I can either do that here or earlier... But it actually is not so big a deal to just do it here, let's do it here.
+                    if not ixi: # initialize on first loop.
+                        multirecordingSplit = currentRecording.split_by("group") # this will be appended to
+                    else:
+                        recordingSplit = currentRecording.split_by("group")
+                        for shankCount, thisShank in enumerate(recordingSplit):
+                            multirecordingSplit[shankCount] = si.concatenate_recordings([multirecordingSplit[shankCount],recordingSplit[shankCount]])
 
-                ### KS MOTION
-                ## default (works decently)
-                motion = estimate_motion(recording=pickleJar["multirecordingInput"], peaks=peaks,
-                                          peak_locations=peak_locations, method="iterative_template", bin_s=2.0,
-                                          rigid=False, win_step_um=200.0, win_scale_um=400.0,hist_margin_um=0 ,
-                                          win_shape="rect")
-            motion = estimate_motion(recording=multirecordingInput, peaks=peaks,
-                                     peak_locations=peak_locations, method="iterative_template", bin_s=bin_s_sessionCat,
-                                     rigid=False, win_step_um=50.0, win_scale_um=100.0, hist_margin_um=0,
-                                     win_shape="gaussian",
-                                     num_amp_bins=5)  # this works on my test case. ks defaults, but with win_scale_um=100.0,  win_step_um=50.0, win_shape="gaussian", num_amp_bins=5, bin_s=6.0
 
-            # whitened_recording = si.whiten(recording=multirecordingInput,dtype=float,int_scale=200)
+                job_kwargs = dict(chunk_duration='1s',n_jobs=desired_n_jobs,progress_bar=True) #,
+                ### motion correction
+                for shankCount, enumerateIsNotWorkingSoIgnoreThis in enumerate(multirecordingSplit):
 
-            # rec_corrected = interpolate_motion(recording=whitened_recording, motion=motion, border_mode="force_extrapolate",
-            #                                    spatial_interpolation_method="kriging", sigma_um=20.,p=2) # ks defaults. force extrapolate maybe weird.
-            rec_corrected_nonWhitened = interpolate_motion(recording=multirecordingInput, motion=motion,
-                                                           border_mode="force_extrapolate",
-                                                           spatial_interpolation_method="kriging", sigma_um=20., p=2)
-            rec_corrected = rec_corrected_nonWhitened.astype('int16')
-            rec_corrected = si.whiten(recording=rec_corrected, int_scale=200)
-            peak_locations_after = sm.correct_motion_on_peaks(peaks, peak_locations, motion, rec_corrected)
-            #multirecordingInput = multirecordingInput.astype('int16')
-            whitened_recording = si.whiten(recording=multirecordingInput.astype('int16'), int_scale=200)
+                    multirecordingThisShank = multirecordingSplit[shankCount]
 
-            if False: # plotting functions. Will probably extract them otherwise.
-            ### see below the length I need to go to to plot the peak locations as a function of space and time...
-                figure_folder = output_folder_sorted / Path("figures_Jeffstyle")
-                figure_folder.mkdir(parents=True, exist_ok=True)
+                    peaks = detect_peaks(recording=multirecordingThisShank, method="locally_exclusive", peak_sign="neg",
+                                             detect_threshold=5.0, exclude_sweep_ms=0.1, radius_um=50,
+                                             **job_kwargs)  # seems like there isn't a unique peak detection algorithm for ks? I don't actually think that's true, I believe they use templates... But with SI, maybe not. I should maybe just look into the high level function and see what is done
+                    peak_locations = localize_peaks(recording=multirecordingThisShank, peaks=peaks, method="grid_convolution",
+                                                    weight_method={"mode": "gaussian_2d",
+                                                                   "sigma_list_um": np.linspace(5, 25, 5)}, **job_kwargs)
+                    motion = estimate_motion(recording=multirecordingThisShank, peaks=peaks,
+                                             peak_locations=peak_locations, method="iterative_template", bin_s=bin_s_sessionCat,
+                                             rigid=False, win_step_um=50.0, win_scale_um=100.0, hist_margin_um=0,
+                                             win_shape="gaussian",
+                                             num_amp_bins=5)  # this works on my test case. ks defaults, but with win_scale_um=100.0,  win_step_um=50.0, win_shape="gaussian", num_amp_bins=5, bin_s=6.0
+                    rec_corrected = interpolate_motion(recording=multirecordingThisShank, motion=motion,
+                                                               border_mode="force_extrapolate",
+                                                               spatial_interpolation_method="kriging", sigma_um=20., p=2)
+
+
+                    peak_locations_after = sm.correct_motion_on_peaks(peaks, peak_locations, motion, rec_corrected)
+
+                    if savePreprocessing: ### need to make changes to this to either save each shank seperately or to save them all together... Should also have a list of channel-group matchups.
+                        shankfolderName = Path("Shank_" + str(shankCount)) ### I did not check if group number and absolute shank number align. Probably they do.
+                        picklePath = output_folder_sorted / shankfolderName
+                        picklePath.mkdir(parents=True, exist_ok=True)
+                        pickleName = 'preprocess_results.pkl'
+                        if (not (picklePath / pickleName).is_file())|overwritePreprocessing:
+                            pickleJar = dict(peaks=peaks, peak_locations=peak_locations, multirecordingThisShank=multirecordingThisShank,rec_corrected=rec_corrected,motion=motion,peak_locations_after=peak_locations_after)
+                            with open(picklePath / pickleName, 'wb') as file:
+                                pickle.dump(pickleJar, file)
+
+
+                    if calculateSessionMotionDisplacement:
+                        sessionEnds = np.asarray(multirecordingThisShank._recording_segments[0].all_length)/30000
+                        sessionEnds = np.cumsum(sessionEnds)
+                        # Recording average motion over a week
+                        motion_space = motion.displacement
+                        motion_space = motion_space[0]
+                        bins_per_session=[]
+                        bins_per_session_numpyStyle = np.zeros((len(sessionEnds),motion_space.shape[1]))
+                        for count,i in enumerate(sessionEnds):
+                            end_session_bin= np.where(motion.temporal_bin_edges_s[0] < i)
+                            endSessionBin = end_session_bin[0][-1]-1
+                            if i==sessionEnds[0]:
+                                bins_per_session.append(np.mean(motion_space[0:endSessionBin], axis=0))
+                                bins_per_session_numpyStyle[count,:] = np.mean(motion_space[0:endSessionBin], axis=0)
+                            else:
+                                bins_per_session.append(np.mean(motion_space[prev_end_session_bin:endSessionBin], axis=0))
+                                bins_per_session_numpyStyle[count,:] = np.mean(motion_space[prev_end_session_bin:endSessionBin], axis=0)
+                            prev_end_session_bin = endSessionBin
+                        motion_average = np.mean(motion_space, axis=0)
+                        record_motion_this_shank = [] # used to be record_motion_weeks, but we no longer actually want that format anyway and it was causing bugs.
+                        record_space_this_shank = []
+                        record_motion_sessions = []
+                        record_space_bins_sessions = []
+                        if not sessionSetCount:
+                            record_motion_this_shank.append(motion_average)
+                            record_space_this_shank.append(motion.spatial_bins_um)
+                            for i in bins_per_session:
+                                record_motion_sessions.append(i)
+                                record_space_bins_sessions.append(motion.spatial_bins_um)
+                        else:
+                            record_motion_this_shank.append(motion_average)
+                            record_space_this_shank.append(motion.spatial_bins_um + record_motion_this_shank[sessionSetCount-1])
+                            for i in bins_per_session:
+                                record_motion_sessions.append(i)
+                                record_space_bins_sessions.append(motion.spatial_bins_um + record_motion_this_shank[sessionSetCount-1])
+                            #record_motion.append(record_motion[sessionSetCount-1]+motion_average)
+                        #record_space_bins.append(motion.spatial_bins_um)
+                        breakPointSpot = "here"
+
+
+                    ### the following will have been designed to have looped multiple times maybe, but we don't need that functionality.
+                        week+=1 # just in case, but I don't see this variable...
+
+                        record_motion_this_shank = np.array(record_motion_this_shank)
+                        record_space_this_shank = np.array(record_space_this_shank)
+                        N, M = record_motion_this_shank.shape
+                        rows = []
+                        for i in range(N):
+                            for j in range(M):
+                                rows.append((sessionsToDo[i], record_motion_this_shank[i, j], record_space_this_shank[i, j])) ### WARNING use of sessionsToDo may be wrong here
+
+                        df_weeks = pd.DataFrame(rows, columns=["session_week", "motion", "center_space_bin"])
+
+                        record_motion_sessions = np.array(record_motion_sessions)
+                        record_space_bins_sessions = np.array(record_space_bins_sessions)
+                        N, M = record_motion_sessions.shape
+                        rows = []
+                        for i in range(N):
+                            for j in range(M):
+                                rows.append((i, record_motion_sessions[i, j], record_space_bins_sessions[i, j]))
+
+                        df_sessions = pd.DataFrame(rows, columns=["session", "motion", "center_space_bin"])
+                        if resaveMotionIfLoadingPreprocessing:
+                            motionSaveFolder = phy_folder / shankfolderName
+                            motionSaveFolder.mkdir(parents=True, exist_ok=True)
+
+
+                            # Save to CSV
+                            df_weeks.to_csv(motionSaveFolder / "motion_weeks.csv", index=False)
+                            df_sessions.to_csv(motionSaveFolder / "motion_sessions.csv", index=False)
+                            week_session_correspondance = np.array(week_session_correspondance)
+                            np.save(motionSaveFolder / "session_to_week_id", week_session_correspondance)
+
+                        pass
+            else:
+                for folderCount,shankfolderName in enumerate(list(output_folder_sorted.glob('Shank*'))):
+
+                    picklePath = output_folder_sorted / shankfolderName
+                    pickleName = 'preprocess_results.pkl'
+                    if (not (picklePath / pickleName).is_file())|overwritePreprocessing:
+                        with open(picklePath / pickleName, 'rb') as file:
+                            pickleJar = pickle.load(file)
+                    peaks = pickleJar["peaks"]
+                    peak_locations = pickleJar["peak_locations"]
+                    multirecordingThisShank = pickleJar["multirecordingThisShank"]
+                    rec_corrected = pickleJar["rec_corrected"]
+                    motion = pickleJar["motion"]
+                    peak_locations_after = pickleJar["peak_locations_after"]
+
+                    if checkMotionPlotsOnline:
+                        matplotlib.use('TkAgg')
+                        scatterArray = np.zeros((len(peak_locations), 3))
+                        xLocationToCheckShank = np.zeros((len(peak_locations), 1))
+                        for iiii in range(0, len(peak_locations)):
+                            scatterArray[iiii, 0] = peaks[iiii][0]
+
+                            scatterArray[iiii, 1] = peak_locations[iiii][1]
+                            scatterArray[iiii, 2] = peak_locations_after[iiii][1]
+                            xLocationToCheckShank[iiii] = peak_locations[iiii][0]
+                        plt.figure()
+                        plt.scatter([1, 2, 3], [2, 4, 3])  # for some reason this helps the other figures load...
+                        plt.show()
+                        plt.figure()
+                        plt.scatter(scatterArray[:, 0] / 30000, scatterArray[:, 1], s=0.0005, c="black")
+                        plt.gca().invert_yaxis()
+                        plt.show()
+                        plt.figure()
+                        plt.scatter(scatterArray[:, 0] / 30000, scatterArray[:, 2], s=0.0005, c="black")
+                        plt.gca().invert_yaxis()
+                        plt.show()
+                        plt.figure()
+                        plt.hist(xLocationToCheckShank,100) # for some reason this helps the other figures load...
+                        plt.show()
+
+                        plt.figure()
+                        plt.scatter([1, 2, 3], [2, 4, 3])  # for some reason this helps the other figures load...
+                        plt.show()
+
+
+                        breakPointSpot = "here"
+
+                    if calculateSessionMotionDisplacement:
+                        sessionEnds = np.asarray(multirecordingThisShank._recording_segments[0].all_length)/30000
+                        sessionEnds = np.cumsum(sessionEnds)
+                        # Recording average motion over a week
+                        motion_space = motion.displacement
+                        motion_space = motion_space[0]
+                        bins_per_session=[]
+                        bins_per_session_numpyStyle = np.zeros((len(sessionEnds),motion_space.shape[1]))
+                        for count,i in enumerate(sessionEnds):
+                            end_session_bin= np.where(motion.temporal_bin_edges_s[0] < i)
+                            endSessionBin = end_session_bin[0][-1]-1
+                            if i==sessionEnds[0]:
+                                bins_per_session.append(np.mean(motion_space[0:endSessionBin], axis=0))
+                                bins_per_session_numpyStyle[count,:] = np.mean(motion_space[0:endSessionBin], axis=0)
+                            else:
+                                bins_per_session.append(np.mean(motion_space[prev_end_session_bin:endSessionBin], axis=0))
+                                bins_per_session_numpyStyle[count,:] = np.mean(motion_space[prev_end_session_bin:endSessionBin], axis=0)
+                            prev_end_session_bin = endSessionBin
+                        motion_average = np.mean(motion_space, axis=0)
+                        record_motion_this_shank = [] # used to be record_motion_weeks, but we no longer actually want that format anyway and it was causing bugs.
+                        record_space_this_shank = []
+                        record_motion_sessions = []
+                        record_space_bins_sessions = []
+                        if not sessionSetCount:
+                            record_motion_this_shank.append(motion_average)
+                            record_space_this_shank.append(motion.spatial_bins_um)
+                            for i in bins_per_session:
+                                record_motion_sessions.append(i)
+                                record_space_bins_sessions.append(motion.spatial_bins_um)
+                        else:
+                            record_motion_this_shank.append(motion_average)
+                            record_space_this_shank.append(motion.spatial_bins_um + record_motion_this_shank[sessionSetCount-1])
+                            for i in bins_per_session:
+                                record_motion_sessions.append(i)
+                                record_space_bins_sessions.append(motion.spatial_bins_um + record_motion_this_shank[sessionSetCount-1])
+                            #record_motion.append(record_motion[sessionSetCount-1]+motion_average)
+                        #record_space_bins.append(motion.spatial_bins_um)
+                        breakPointSpot = "here"
+
+
+                    ### the following will have been designed to have looped multiple times maybe, but we don't need that functionality.
+                        week+=1 # just in case, but I don't see this variable...
+
+                        record_motion_this_shank = np.array(record_motion_this_shank)
+                        record_space_this_shank = np.array(record_space_this_shank)
+                        N, M = record_motion_this_shank.shape
+                        rows = []
+                        for i in range(N):
+                            for j in range(M):
+                                rows.append((sessionsToDo[i], record_motion_this_shank[i, j], record_space_this_shank[i, j])) ### WARNING use of sessionsToDo may be wrong here
+
+                        df_weeks = pd.DataFrame(rows, columns=["session_week", "motion", "center_space_bin"])
+
+                        record_motion_sessions = np.array(record_motion_sessions)
+                        record_space_bins_sessions = np.array(record_space_bins_sessions)
+                        N, M = record_motion_sessions.shape
+                        rows = []
+                        for i in range(N):
+                            for j in range(M):
+                                rows.append((i, record_motion_sessions[i, j], record_space_bins_sessions[i, j]))
+
+                        df_sessions = pd.DataFrame(rows, columns=["session", "motion", "center_space_bin"])
+                        if resaveMotionIfLoadingPreprocessing:
+                            motionSaveFolder = phy_folder / shankfolderName
+                            motionSaveFolder.mkdir(parents=True, exist_ok=True)
+
+
+                            # Save to CSV
+                            df_weeks.to_csv(motionSaveFolder / "motion_weeks.csv", index=False)
+                            df_sessions.to_csv(motionSaveFolder / "motion_sessions.csv", index=False)
+                            week_session_correspondance = np.array(week_session_correspondance)
+                            np.save(motionSaveFolder / "session_to_week_id", week_session_correspondance)
+
+                        pass
+
+
+
+        else:
+
+            if doPreprocessing:
+                ### recent stuff to hide with ifs later
+                ### motion correction
+
+                job_kwargs = dict(chunk_duration='1s',n_jobs=desired_n_jobs,progress_bar=True) #,
+                ### KS defaults, which I am using
+                if testingThings:
+                    peaks = detect_peaks(recording=multirecordingInput, method="locally_exclusive", peak_sign="neg",
+                                         detect_threshold=5.0, exclude_sweep_ms=0.1, radius_um=50,
+                                         **job_kwargs)  # seems like there isn't a unique peak detection algorithm for ks? I don't actually think that's true, I believe they use templates... But with SI, maybe not. I should maybe just look into the high level function and see what is done
+                else:
+                    peaks = detect_peaks(recording=multirecordingInput, method="locally_exclusive", peak_sign="neg",
+                                         detect_threshold=8.0, exclude_sweep_ms=0.1, radius_um=50,
+                                         **job_kwargs)  # seems like there isn't a unique peak detection algorithm for ks? I don't actually think that's true, I believe they use templates... But with SI, maybe not. I should maybe just look into the high level function and see what is done
+                peak_locations = localize_peaks(recording=multirecordingInput, peaks=peaks, method="grid_convolution",
+                                                weight_method={"mode": "gaussian_2d",
+                                                               "sigma_list_um": np.linspace(5, 25, 5)}, **job_kwargs)
+                if False: # contains defaults for other stuff
+                    #### commented out: DREDGE defaults
+                    peaks = detect_peaks(recording=multirecordingInput, method="locally_exclusive",peak_sign="neg",detect_threshold=8.0,exclude_sweep_ms=0.8,radius_um=80.0, **job_kwargs) #
+                    peak_locations = localize_peaks(recording=multirecordingInput, peaks=peaks, method="monopolar_triangulation", **job_kwargs)
+                    ### DREDGE MOTION
+                    motion = estimate_motion(recording=pickleJar["multirecordingInput"], peaks=peaks,
+                                             peak_locations=peak_locations, method="dredge_ap", direction="y",
+                                             rigid=False, win_step_um=400.0, win_scale_um=400.0, win_margin_um=None, bin_s=30,
+                                             time_horizon_s=100) ### this is all mostly default DREDGE, but the time horizon is new. On my test case it works passably on my first two sessions, then completely fails to capture the third day for unknown reasons.
+                    rec_corrected = interpolate_motion(recording=whitened_recording,motion=motion,border_mode="remove_channels",spatial_interpolation_method="kriging",sigma_um=30.)
+
+                    ### KS MOTION
+                    ## default (works decently)
+                    motion = estimate_motion(recording=pickleJar["multirecordingInput"], peaks=peaks,
+                                              peak_locations=peak_locations, method="iterative_template", bin_s=2.0,
+                                              rigid=False, win_step_um=200.0, win_scale_um=400.0,hist_margin_um=0 ,
+                                              win_shape="rect")
+                motion = estimate_motion(recording=multirecordingInput, peaks=peaks,
+                                         peak_locations=peak_locations, method="iterative_template", bin_s=bin_s_sessionCat,
+                                         rigid=False, win_step_um=50.0, win_scale_um=100.0, hist_margin_um=0,
+                                         win_shape="gaussian",
+                                         num_amp_bins=5)  # this works on my test case. ks defaults, but with win_scale_um=100.0,  win_step_um=50.0, win_shape="gaussian", num_amp_bins=5, bin_s=6.0
+
+                # whitened_recording = si.whiten(recording=multirecordingInput,dtype=float,int_scale=200)
+
+                # rec_corrected = interpolate_motion(recording=whitened_recording, motion=motion, border_mode="force_extrapolate",
+                #                                    spatial_interpolation_method="kriging", sigma_um=20.,p=2) # ks defaults. force extrapolate maybe weird.
+                rec_corrected_nonWhitened = interpolate_motion(recording=multirecordingInput, motion=motion,
+                                                               border_mode="force_extrapolate",
+                                                               spatial_interpolation_method="kriging", sigma_um=20., p=2)
+                rec_corrected = rec_corrected_nonWhitened.astype('int16')
+                rec_corrected = si.whiten(recording=rec_corrected, int_scale=200)
+                peak_locations_after = sm.correct_motion_on_peaks(peaks, peak_locations, motion, rec_corrected)
+                #multirecordingInput = multirecordingInput.astype('int16')
+                whitened_recording = si.whiten(recording=multirecordingInput.astype('int16'), int_scale=200)
+
+                if False: # plotting functions. Will probably extract them otherwise.
+                ### see below the length I need to go to to plot the peak locations as a function of space and time...
+                    figure_folder = output_folder_sorted / Path("figures_Jeffstyle")
+                    figure_folder.mkdir(parents=True, exist_ok=True)
+                    scatterArray = np.zeros((len(peak_locations), 3))
+                    for iiii in range(0, len(peak_locations)):
+                        scatterArray[iiii, 0] = peaks[iiii][0]
+                        scatterArray[iiii, 1] = peak_locations[iiii][1]
+                        scatterArray[iiii, 2] = peak_locations_after[iiii][1]
+                    plt.figure()
+                    plt.scatter(scatterArray[:,0]/30000, scatterArray[:,1],s=0.01,c="black")
+                    plt.gca().invert_yaxis()
+                    plt.savefig(figure_folder / Path("MotionScatterBeforeCorrection.pdf"))
+                    plt.figure()
+                    plt.scatter(scatterArray[:, 0] / 30000, scatterArray[:, 2], s=0.01, c="black")
+                    plt.gca().invert_yaxis()
+                    plt.savefig(figure_folder / Path("MotionScatterAfterCorrection.pdf"))
+
+                if savePreprocessing:
+
+                    picklePath = output_folder_sorted
+                    if testingThings:
+                        pickleName = 'preprocess_results_testingThingsMore.pkl'
+                    else:
+                        pickleName = 'preprocess_results.pkl'
+                    if (not (picklePath / pickleName).is_file())|overwritePreprocessing:
+                        pickleJar = dict(peaks=peaks, peak_locations=peak_locations, multirecordingInput=multirecordingInput,rec_corrected=rec_corrected,whitened_recording=whitened_recording,rec_corrected_nonWhitened=rec_corrected_nonWhitened,motion=motion,peak_locations_after=peak_locations_after)
+                        with open(picklePath / pickleName, 'wb') as file:
+                            pickle.dump(pickleJar, file)
+
+            # multirecordingInput = multirecordingInput.save(folder="C:\Jeffrey\Projects\SpeechAndNoise\Spikesorting_Inputs\Preprocessed", n_jobs=10, chunk_duration='1s') # this function removes the extra channel. So 384 instead of 385.
+            if doPreprocessing:
+                df_rec = pd.DataFrame(multirec_info)
+                df_rec.to_csv(phy_folder / 'multirec_info.csv',
+                              index=False)  # this is the earliest phy folder around and may be a problem...
+            else:
+                # then need to load the recording
+                # I originally saved this after entering spikesorting_pipeline so may need to change names later.
+                picklePath = output_folder_sorted
+                if testingThings:
+                    pickleName = 'preprocess_results_testingThingsMore.pkl'
+                else:
+                    pickleName = 'preprocess_results.pkl'
+                with open(picklePath / pickleName, 'rb') as file:
+                    pickleJar = pickle.load(file)
+                peaks = pickleJar["peaks"]
+                peak_locations = pickleJar["peak_locations"]
+                multirecordingInput = pickleJar["multirecordingInput"]
+                rec_corrected = pickleJar["rec_corrected"]
+                if not("motion" in pickleJar):
+                    motion = estimate_motion(recording=multirecordingInput, peaks=peaks,
+                                             peak_locations=peak_locations, method="iterative_template", bin_s=bin_s_sessionCat,
+                                             rigid=False, win_step_um=50.0, win_scale_um=100.0, hist_margin_um=0,
+                                             win_shape="gaussian", num_amp_bins=5)
+                    peak_locations_after = sm.correct_motion_on_peaks(peaks, peak_locations, motion, multirecordingInput)
+                    whitened_recording = pickleJar["whitened_recording"] # load also the other stuff before replacing
+                    rec_corrected_nonWhitened = pickleJar["rec_corrected_nonWhitened"]
+
+                    pickleJar = dict(peaks=peaks, peak_locations=peak_locations, multirecordingInput=multirecordingInput,
+                                     rec_corrected=rec_corrected, whitened_recording=whitened_recording,
+                                     rec_corrected_nonWhitened=rec_corrected_nonWhitened, motion=motion,
+                                     peak_locations_after=peak_locations_after)
+                    with open(picklePath / pickleName, 'wb') as file:
+                        pickle.dump(pickleJar, file)
+                else:
+                    motion = pickleJar["motion"]
+                    peak_locations_after = pickleJar["peak_locations_after"]
+            if False: # allows access to motion extras to maybe begin to look at interpolation... But I may not need it.
+                motion,extras = estimate_motion(recording=multirecordingInput, peaks=peaks,
+                                         peak_locations=peak_locations, method="iterative_template", bin_s=bin_s_sessionCat,
+                                         rigid=False, win_step_um=50.0, win_scale_um=100.0, hist_margin_um=0,
+                                         win_shape="gaussian",
+                                         num_amp_bins=5,extra_outputs=True)
+
+            if checkMotionPlotsOnline:
+                matplotlib.use('TkAgg')
                 scatterArray = np.zeros((len(peak_locations), 3))
                 for iiii in range(0, len(peak_locations)):
                     scatterArray[iiii, 0] = peaks[iiii][0]
                     scatterArray[iiii, 1] = peak_locations[iiii][1]
                     scatterArray[iiii, 2] = peak_locations_after[iiii][1]
                 plt.figure()
-                plt.scatter(scatterArray[:,0]/30000, scatterArray[:,1],s=0.01,c="black")
+                plt.scatter([1, 2, 3], [2, 4, 3])  # for some reason this helps the other figures load...
+                plt.show()
+                plt.figure()
+                plt.scatter(scatterArray[:, 0] / 30000, scatterArray[:, 1], s=0.01, c="black")
                 plt.gca().invert_yaxis()
-                plt.savefig(figure_folder / Path("MotionScatterBeforeCorrection.pdf"))
+                plt.show()
                 plt.figure()
                 plt.scatter(scatterArray[:, 0] / 30000, scatterArray[:, 2], s=0.01, c="black")
                 plt.gca().invert_yaxis()
-                plt.savefig(figure_folder / Path("MotionScatterAfterCorrection.pdf"))
-
-            if savePreprocessing:
-                picklePath = output_folder_sorted
-                pickleName = 'preprocess_results.pkl'
-                if (not (picklePath / pickleName).is_file())|overwritePreprocessing:
-                    pickleJar = dict(peaks=peaks, peak_locations=peak_locations, multirecordingInput=multirecordingInput,rec_corrected=rec_corrected,whitened_recording=whitened_recording,rec_corrected_nonWhitened=rec_corrected_nonWhitened,motion=motion,peak_locations_after=peak_locations_after)
-                    with open(picklePath / pickleName, 'wb') as file:
-                        pickle.dump(pickleJar, file)
-
-        # multirecordingInput = multirecordingInput.save(folder="C:\Jeffrey\Projects\SpeechAndNoise\Spikesorting_Inputs\Preprocessed", n_jobs=10, chunk_duration='1s') # this function removes the extra channel. So 384 instead of 385.
-        if doPreprocessing:
-            df_rec = pd.DataFrame(multirec_info)
-            df_rec.to_csv(phy_folder / 'multirec_info.csv',
-                          index=False)  # this is the earliest phy folder around and may be a problem...
-        else:
-            # then need to load the recording
-            # I originally saved this after entering spikesorting_pipeline so may need to change names later.
-            picklePath = output_folder_sorted
-            pickleName = 'preprocess_results.pkl'
-            with open(picklePath / pickleName, 'rb') as file:
-                pickleJar = pickle.load(file)
-            peaks = pickleJar["peaks"]
-            peak_locations = pickleJar["peak_locations"]
-            multirecordingInput = pickleJar["multirecordingInput"]
-            rec_corrected = pickleJar["rec_corrected"]
-            if not("motion" in pickleJar):
-                motion = estimate_motion(recording=multirecordingInput, peaks=peaks,
-                                         peak_locations=peak_locations, method="iterative_template", bin_s=bin_s_sessionCat,
-                                         rigid=False, win_step_um=50.0, win_scale_um=100.0, hist_margin_um=0,
-                                         win_shape="gaussian", num_amp_bins=5)
-                peak_locations_after = sm.correct_motion_on_peaks(peaks, peak_locations, motion, multirecordingInput)
-                whitened_recording = pickleJar["whitened_recording"] # load also the other stuff before replacing
-                rec_corrected_nonWhitened = pickleJar["rec_corrected_nonWhitened"]
-
-                pickleJar = dict(peaks=peaks, peak_locations=peak_locations, multirecordingInput=multirecordingInput,
-                                 rec_corrected=rec_corrected, whitened_recording=whitened_recording,
-                                 rec_corrected_nonWhitened=rec_corrected_nonWhitened, motion=motion,
-                                 peak_locations_after=peak_locations_after)
-                with open(picklePath / pickleName, 'wb') as file:
-                    pickle.dump(pickleJar, file)
-            else:
-                motion = pickleJar["motion"]
-                peak_locations_after = pickleJar["peak_locations_after"]
-        if checkMotionPlotsOnline:
-            matplotlib.use('TkAgg')
-            scatterArray = np.zeros((len(peak_locations), 3))
-            for iiii in range(0, len(peak_locations)):
-                scatterArray[iiii, 0] = peaks[iiii][0]
-                scatterArray[iiii, 1] = peak_locations[iiii][1]
-                scatterArray[iiii, 2] = peak_locations_after[iiii][1]
-            plt.figure()
-            plt.scatter([1, 2, 3], [2, 4, 3])  # for some reason this helps the other figures load...
-            plt.show()
-            plt.figure()
-            plt.scatter(scatterArray[:, 0] / 30000, scatterArray[:, 1], s=0.01, c="black")
-            plt.gca().invert_yaxis()
-            plt.show()
-            plt.figure()
-            plt.scatter(scatterArray[:, 0] / 30000, scatterArray[:, 2], s=0.01, c="black")
-            plt.gca().invert_yaxis()
-            plt.show()
-            plt.figure()
-            plt.scatter([1,2,3],[2,4,3]) # for some reason this helps the other figures load...
-            plt.show()
-            breakPointSpot = "here"
-        if calculateSessionMotionDisplacement:
-            sessionEnds = np.asarray(multirecordingInput._recording_segments[0].all_length)/30000
-            sessionEnds = np.cumsum(sessionEnds)
-            # Recording average motion over a week
-            motion_space = motion.displacement
-            motion_space = motion_space[0]
-            bins_per_session=[]
-            bins_per_session_numpyStyle = np.zeros((len(sessionEnds),motion_space.shape[1]))
-            for count,i in enumerate(sessionEnds):
-                end_session_bin= np.where(motion.temporal_bin_edges_s[0] < i)
-                endSessionBin = end_session_bin[0][-1]-1
-                if i==sessionEnds[0]:
-                    bins_per_session.append(np.mean(motion_space[0:endSessionBin], axis=0))
-                    bins_per_session_numpyStyle[count,:] = np.mean(motion_space[0:endSessionBin], axis=0)
+                plt.show()
+                plt.figure()
+                plt.scatter([1,2,3],[2,4,3]) # for some reason this helps the other figures load...
+                plt.show()
+                breakPointSpot = "here"
+            if calculateSessionMotionDisplacement:
+                sessionEnds = np.asarray(multirecordingInput._recording_segments[0].all_length)/30000
+                sessionEnds = np.cumsum(sessionEnds)
+                # Recording average motion over a week
+                motion_space = motion.displacement
+                motion_space = motion_space[0]
+                bins_per_session=[]
+                bins_per_session_numpyStyle = np.zeros((len(sessionEnds),motion_space.shape[1]))
+                for count,i in enumerate(sessionEnds):
+                    end_session_bin= np.where(motion.temporal_bin_edges_s[0] < i)
+                    endSessionBin = end_session_bin[0][-1]-1
+                    if i==sessionEnds[0]:
+                        bins_per_session.append(np.mean(motion_space[0:endSessionBin], axis=0))
+                        bins_per_session_numpyStyle[count,:] = np.mean(motion_space[0:endSessionBin], axis=0)
+                    else:
+                        bins_per_session.append(np.mean(motion_space[prev_end_session_bin:endSessionBin], axis=0))
+                        bins_per_session_numpyStyle[count,:] = np.mean(motion_space[prev_end_session_bin:endSessionBin], axis=0)
+                    prev_end_session_bin = endSessionBin
+                motion_average = np.mean(motion_space, axis=0)
+                if not sessionSetCount:
+                    record_motion_weeks.append(motion_average)
+                    record_space_bins_weeks.append(motion.spatial_bins_um)
+                    for i in bins_per_session:
+                        record_motion_sessions.append(i)
+                        record_space_bins_sessions.append(motion.spatial_bins_um)
                 else:
-                    bins_per_session.append(np.mean(motion_space[prev_end_session_bin:endSessionBin], axis=0))
-                    bins_per_session_numpyStyle[count,:] = np.mean(motion_space[prev_end_session_bin:endSessionBin], axis=0)
-                prev_end_session_bin = endSessionBin
-            motion_average = np.mean(motion_space, axis=0)
-            if not sessionSetCount:
-                record_motion_weeks.append(motion_average)
-                record_space_bins_weeks.append(motion.spatial_bins_um)
-                for i in bins_per_session:
-                    record_motion_sessions.append(i)
-                    record_space_bins_sessions.append(motion.spatial_bins_um)
-            else:
-                record_motion_weeks.append(motion_average)
-                record_space_bins_weeks.append(motion.spatial_bins_um + record_motion_weeks[sessionSetCount-1])
-                for i in bins_per_session:
-                    record_motion_sessions.append(i)
-                    record_space_bins_sessions.append(motion.spatial_bins_um + record_motion_weeks[sessionSetCount-1])
-                #record_motion.append(record_motion[sessionSetCount-1]+motion_average)
-            #record_space_bins.append(motion.spatial_bins_um)
-            breakPointSpot = "here"
+                    record_motion_weeks.append(motion_average)
+                    record_space_bins_weeks.append(motion.spatial_bins_um + record_motion_weeks[sessionSetCount-1])
+                    for i in bins_per_session:
+                        record_motion_sessions.append(i)
+                        record_space_bins_sessions.append(motion.spatial_bins_um + record_motion_weeks[sessionSetCount-1])
+                    #record_motion.append(record_motion[sessionSetCount-1]+motion_average)
+                #record_space_bins.append(motion.spatial_bins_um)
+                breakPointSpot = "here"
 
 
-            if False: # within here, I will stre the means to make the version of the plot I used for ICAC 2025, which is a mostly specialized plot for PFC first week Challah
-                figure_folder = output_folder_sorted / Path("figures_Jeffstyle")
-                figure_folder.mkdir(parents=True, exist_ok=True)
-                yrangeForPlots = np.array([3330,4000])
-                xRangeForPlots = np.array([237,2575])
-                sessionEndsFirstFour = np.asarray(multirecordingInput._recording_segments[0].all_length)[0:4]/30000
-                sessionEndsFirstFour = np.cumsum(sessionEndsFirstFour)
-                if True: # first, before the correction
-                    figureAddress = figure_folder / Path('/BeforeCorrection.pdf')
-                    Before_Correction_pdf = PdfPages(figureAddress)
+                if False: # within here, I will stre the means to make the version of the plot I used for ICAC 2025, which is a mostly specialized plot for PFC first week Challah
+                    figure_folder = output_folder_sorted / Path("figures_Jeffstyle")
+                    figure_folder.mkdir(parents=True, exist_ok=True)
+                    yrangeForPlots = np.array([3330,4000])
+                    xRangeForPlots = np.array([237,2575])
+                    sessionEndsFirstFour = np.asarray(multirecordingInput._recording_segments[0].all_length)[0:4]/30000
+                    sessionEndsFirstFour = np.cumsum(sessionEndsFirstFour)
+                    if True: # first, before the correction
+                        figureAddress = figure_folder / Path('/BeforeCorrection.pdf')
+                        Before_Correction_pdf = PdfPages(figureAddress)
 
-                    BeforeCorrectionPlot, BeforeCorrectionAxis = plt.subplots()
-
-
-                    BeforeCorrectionAxis.scatter((scatterArray[:, 0] / 30000)-xRangeForPlots[0], scatterArray[:, 1], s=0.01, c="black")
-                    for sessionEnds in sessionEndsFirstFour:
-                        BeforeCorrectionAxis.axvline(x=sessionEnds-xRangeForPlots[0], color='r', linestyle='--')
+                        BeforeCorrectionPlot, BeforeCorrectionAxis = plt.subplots()
 
 
-                    BeforeCorrectionAxis.set_xlim([xRangeForPlots[0]-xRangeForPlots[0], xRangeForPlots[1]-xRangeForPlots[0]])
-                    BeforeCorrectionAxis.set_ylim([yrangeForPlots[0], yrangeForPlots[1]])
-                    BeforeCorrectionAxis.invert_yaxis()
-
-                    Before_Correction_pdf.savefig(BeforeCorrectionPlot)
-                    Before_Correction_pdf.close()
-                    #BeforeCorrectionPlot.show()
-
-                if True: # then, after the correction
-                    figureAddress = figure_folder / Path('/AfterCorrection.pdf')
-                    After_Correction_pdf = PdfPages(figureAddress)
-
-                    AfterCorrectionPlot, AfterCorrectionAxis = plt.subplots()
+                        BeforeCorrectionAxis.scatter((scatterArray[:, 0] / 30000)-xRangeForPlots[0], scatterArray[:, 1], s=0.01, c="black")
+                        for sessionEnds in sessionEndsFirstFour:
+                            BeforeCorrectionAxis.axvline(x=sessionEnds-xRangeForPlots[0], color='r', linestyle='--')
 
 
-                    AfterCorrectionAxis.scatter((scatterArray[:, 0] / 30000)-xRangeForPlots[0], scatterArray[:, 2], s=0.01, c="black")
-                    for sessionEnds in sessionEndsFirstFour:
-                        AfterCorrectionAxis.axvline(x=sessionEnds-xRangeForPlots[0], color='r', linestyle='--')
+                        BeforeCorrectionAxis.set_xlim([xRangeForPlots[0]-xRangeForPlots[0], xRangeForPlots[1]-xRangeForPlots[0]])
+                        BeforeCorrectionAxis.set_ylim([yrangeForPlots[0], yrangeForPlots[1]])
+                        BeforeCorrectionAxis.invert_yaxis()
+
+                        Before_Correction_pdf.savefig(BeforeCorrectionPlot)
+                        Before_Correction_pdf.close()
+                        #BeforeCorrectionPlot.show()
+
+                    if True: # then, after the correction
+                        figureAddress = figure_folder / Path('/AfterCorrection.pdf')
+                        After_Correction_pdf = PdfPages(figureAddress)
+
+                        AfterCorrectionPlot, AfterCorrectionAxis = plt.subplots()
 
 
-                    AfterCorrectionAxis.set_xlim([xRangeForPlots[0]-xRangeForPlots[0], xRangeForPlots[1]-xRangeForPlots[0]])
-                    AfterCorrectionAxis.set_ylim([yrangeForPlots[0], yrangeForPlots[1]])
-                    AfterCorrectionAxis.invert_yaxis()
-                    After_Correction_pdf.savefig(AfterCorrectionPlot)
-                    After_Correction_pdf.close()
-                    #AfterCorrectionPlot.show()
-            if False: # Another week, to show off the session-length-dependent cell.
-                figure_folder = output_folder_sorted / Path("figures_Jeffstyle")
-                figure_folder.mkdir(parents=True, exist_ok=True)
-                yrangeForPlots = np.array([4333,4863])
-                xRangeForPlots = np.array([0,5000])
-                sessionEndsFirstFew = np.asarray(multirecordingInput._parent._recording_segments[0].all_length)[0:7]/30000
-                sessionEndsFirstFew = np.cumsum(sessionEndsFirstFew)
-                if True: # first, before the correction
-                    figureAddress = figure_folder / Path('/Satiation.pdf')
-                    Satiation_pdf = PdfPages(figureAddress)
-
-                    SatiationPlot, SatiationAxis = plt.subplots()
+                        AfterCorrectionAxis.scatter((scatterArray[:, 0] / 30000)-xRangeForPlots[0], scatterArray[:, 2], s=0.01, c="black")
+                        for sessionEnds in sessionEndsFirstFour:
+                            AfterCorrectionAxis.axvline(x=sessionEnds-xRangeForPlots[0], color='r', linestyle='--')
 
 
-                    SatiationAxis.scatter((scatterArray[:, 0] / 30000)-xRangeForPlots[0], scatterArray[:, 1], s=0.01, c="black")
-                    for sessionEnds in sessionEndsFirstFew:
-                        SatiationAxis.axvline(x=sessionEnds-xRangeForPlots[0], color='r', linestyle='--')
+                        AfterCorrectionAxis.set_xlim([xRangeForPlots[0]-xRangeForPlots[0], xRangeForPlots[1]-xRangeForPlots[0]])
+                        AfterCorrectionAxis.set_ylim([yrangeForPlots[0], yrangeForPlots[1]])
+                        AfterCorrectionAxis.invert_yaxis()
+                        After_Correction_pdf.savefig(AfterCorrectionPlot)
+                        After_Correction_pdf.close()
+                        #AfterCorrectionPlot.show()
+                if False: # Another week, to show off the session-length-dependent cell.
+                    figure_folder = output_folder_sorted / Path("figures_Jeffstyle")
+                    figure_folder.mkdir(parents=True, exist_ok=True)
+                    yrangeForPlots = np.array([4333,4863])
+                    xRangeForPlots = np.array([0,5000])
+                    sessionEndsFirstFew = np.asarray(multirecordingInput._parent._recording_segments[0].all_length)[0:7]/30000
+                    sessionEndsFirstFew = np.cumsum(sessionEndsFirstFew)
+                    if True: # first, before the correction
+                        figureAddress = figure_folder / Path('/Satiation.pdf')
+                        Satiation_pdf = PdfPages(figureAddress)
+
+                        SatiationPlot, SatiationAxis = plt.subplots()
 
 
-                    SatiationAxis.set_xlim([xRangeForPlots[0]-xRangeForPlots[0], xRangeForPlots[1]-xRangeForPlots[0]])
-                    SatiationAxis.set_ylim([yrangeForPlots[0], yrangeForPlots[1]])
-                    SatiationAxis.invert_yaxis()
+                        SatiationAxis.scatter((scatterArray[:, 0] / 30000)-xRangeForPlots[0], scatterArray[:, 1], s=0.01, c="black")
+                        for sessionEnds in sessionEndsFirstFew:
+                            SatiationAxis.axvline(x=sessionEnds-xRangeForPlots[0], color='r', linestyle='--')
 
-                    Satiation_pdf.savefig(SatiationPlot)
-                    Satiation_pdf.close()
-                    SatiationPlot.show()
-        week+=1
 
+                        SatiationAxis.set_xlim([xRangeForPlots[0]-xRangeForPlots[0], xRangeForPlots[1]-xRangeForPlots[0]])
+                        SatiationAxis.set_ylim([yrangeForPlots[0], yrangeForPlots[1]])
+                        SatiationAxis.invert_yaxis()
+
+                        Satiation_pdf.savefig(SatiationPlot)
+                        Satiation_pdf.close()
+                        SatiationPlot.show()
+            week+=1
+
+
+    ### I should clean this stuff up at some point, I don't want to do this weekly business.
     record_motion_weeks = np.array(record_motion_weeks)
     record_space_bins_weeks = np.array(record_space_bins_weeks)
     N, M = record_motion_weeks.shape

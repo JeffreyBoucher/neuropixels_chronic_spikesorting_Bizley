@@ -38,7 +38,7 @@ def spikeglx_visualize(recording):
     w_ts2 = sw.plot_timeseries(recording, time_range=spikeViewRegion, clim=(-20, 20))
     plt.show()
     fakey = 1 + 1
-def spikeglx_preprocessing(recording,doRemoveBadChannels =1,skipStuffThatKSGUIDoes = 0,local_probeFolder=None,badChannelList=[], addNoiseForMotionCorrection=1,bin_s_sessionCat=6.0):
+def spikeglx_preprocessing(recording,doRemoveBadChannels =1,skipStuffThatKSGUIDoes = 0,local_probeFolder=None,badChannelList=[], addNoiseForMotionCorrection=1,bin_s_sessionCat=6.0,silenceOrNoiseReplace='noise'):
     recording = si.phase_shift(recording) #mandatory for NP recordings because the channels are not sampled at the same time.
     windowsToSilenceArray = nullify_saturations(recording, local_probeFolder=local_probeFolder) # find saturations before any further processing. Only finds, doesn't correct.
 
@@ -108,18 +108,18 @@ def spikeglx_preprocessing(recording,doRemoveBadChannels =1,skipStuffThatKSGUIDo
     recording = recording.astype(dtype="float32")
     if windowsToSilenceArray.any():  # code breaks when no saturation
         if global_configs.useBugFixedSilencePeriods:
-            recording = silence_periods_file.silence_periods(recording, windowsToSilenceArray, mode="noise")
+            recording = silence_periods_file.silence_periods(recording, windowsToSilenceArray, mode=silenceOrNoiseReplace)
         else:
-            recording = si.silence_periods(recording, windowsToSilenceArray, mode="noise") # Doing this before whitening might cause issues... I need to understand how whitening works better.
+            recording = si.silence_periods(recording, windowsToSilenceArray, mode=silenceOrNoiseReplace) # Doing this before whitening might cause issues... I need to understand how whitening works better.
         # recording = recording.astype('int16') ### reportedly converting back in this way is dangerous, and I should look into it. I need to do it for harddrive space, but otherwise I shouldn't bother.
     if addNoiseForMotionCorrection:
         pad_size, pad_bounds = size_pad_to_add(recording,bin_s_sessionCat)
         padRecording = recording.frame_slice(0,pad_size)
         recording = si.concatenate_recordings([recording, padRecording])
         if global_configs.useBugFixedSilencePeriods:
-            recording = silence_periods_file.silence_periods(recording, [[pad_bounds[0],recording.get_num_frames()]], mode="noise")
+            recording = silence_periods_file.silence_periods(recording, [[pad_bounds[0],recording.get_num_frames()]], mode=silenceOrNoiseReplace)
         else:
-            recording = si.silence_periods(recording, [[pad_bounds[0],recording.get_num_frames()]], mode="noise")
+            recording = si.silence_periods(recording, [[pad_bounds[0],recording.get_num_frames()]], mode=silenceOrNoiseReplace)
     # spikeglx_visualize(recording)
     return recording
 
@@ -173,12 +173,12 @@ def nullify_saturations(recording,surrondingToAlsoNullify=100,local_probeFolder=
     if True: # section for dealing with specific sessions.
         topFolderString = local_probeFolder.parts[-1]
         if topFolderString[0:19] == "23052024_AM_Challah":
-            # ferret held in hand 45 seconds from end of recording. Should affect both probes
+            # ferret held in hand 45 seconds from end of recording. Should affect both probes ### but it seems like maybe it didn't work? ### Turns out the reason it didn't work is because the recordings are different lengths. Probably what was done was the PFC was unplugged, than the ACx. Rather than basing things 45 seconds from the end, we should do 665 from the beginning
             if alsoCutOffBeginningAndEnd:
-               windowsToSilenceArray = np.concatenate((windowsToSilenceArray[0:-1,:], [[(recording.get_num_frames() - int(recording.sampling_frequency * 45)),recording.get_num_frames()]]))
+               windowsToSilenceArray = np.concatenate((windowsToSilenceArray[0:-1,:], [[(int(recording.sampling_frequency * 665)),recording.get_num_frames()]]))
 
             else:
-                windowsToSilenceArray = np.concatenate((windowsToSilenceArray, [[(recording.get_num_frames() - int(recording.sampling_frequency * 45)),recording.get_num_frames()]]))
+                windowsToSilenceArray = np.concatenate((windowsToSilenceArray, [[(int(recording.sampling_frequency * 665)),recording.get_num_frames()]]))
         if topFolderString[0:19] == "05062024_PM_Challah":
             # ferret held in hand 60 seconds in the middle of the recording... should affect both probes. Might affect behavior. I'll assume at first there is no overlap with detected saturations because why would there be...
                 beginTime = 296.4

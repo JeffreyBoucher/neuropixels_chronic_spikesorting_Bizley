@@ -22,11 +22,12 @@ def main():
 
         #recordingZone = 'PFC_Boule_Borders_Top_GroundrefIThink'
         #recordingZone = 'PFC_Boule_Borders_Top'
-        recordingZone = 'PFC_shank0_Challah'
+        # recordingZone = 'PFC_shank0_Challah'
         #recordingZone = 'PFC_shank3_Challah'
         #recordingZone = 'PFC_shank3_Challah_bottom'
         #recordingZone = "ACx_Challah"
-        output_folder = Path('D:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Output')
+        recordingZone = "ACx_Challah_top_groundref"
+        output_folder = Path('C:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Output')
         sessionsToDo = 'all' # vestige from get_drift_per_session
 
     if True: # contains si arguments
@@ -47,9 +48,9 @@ def main():
         print('warning: not doing any spikesorting. Doing postprocessing instead')
 
     if True: # contains probemap specific stuff. Highly specific to my project. I certainly will functionalize this soon so I can use it in both this and the drift correction script.
-        if recordingZone == 'ACx_Challah':
+        if recordingZone == 'ACx_Challah_top_groundref':
             stream_id = 'imec0.ap'
-            sessionSetLabel = 'All_ACx_Top'
+            sessionSetLabel = 'All_ACx_Top_groundref_MonthOfMay2024'
             channel_map_to_use = 'Challah_top_b1_horizontal_band_ground.imro'
             #channel_map_to_use_other_ref = 'Challah_top_b1_horizontal_band_joint_tip.imro' ### this wouldn't actually work...
             badChannelList = [66,105,149,170,175,209,210,239,354,369]
@@ -110,8 +111,8 @@ def main():
             sessionString = '1305*'
         elif sessionSetLabel == 'TheFirstSession':
             sessionString = '1305*AM*'
-        elif 'July2024' in sessionSetLabel:
-            sessionString = '[0-9][0-9]072024*'
+        elif 'MonthOfMay2024' in sessionSetLabel:
+            sessionString = '[0-9][0-9]052024*'
         else:
             sessionString = '[0-9][0-9]*'
     session_path = Path('Z:/Data/Neuropixels/' + ferret)
@@ -119,7 +120,7 @@ def main():
     sessionSetName = 'everythingAllAtOnce'
 
     sessionsWithinMap = []
-    for i,session in enumerate(SessionsInOrder[0:400]):
+    for i,session in enumerate(SessionsInOrder):
         session_name = session.name
         dp = session_path / session_name
         chan_dict = get_channelmap_names(dp)  # almost works but something about the format is different. no "imRoFile" perameter. There is something called an "imRoTable" which is probably also what I want. But let's deal with this later, when we know we need it. Because, honestly, we want something more sophisticated than this eventually.
@@ -160,8 +161,8 @@ def main():
             #     windowsToSilenceArray = np.loadtxt(Path(f'D:/CSV_Saturation/F2302_Challah/{session_name}/{session_name}_{stream_id[:-3]}/saturatedZones.csv'))
             # else:
             #     windowsToSilenceArray = 1
-            #local_probeFolder = Path('C:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Inputs') / Path(*probeFolder.parts[1:]) #useful if you run the find saturation function
-            local_probeFolder = Path(f'D:/CSV_Saturation/F2302_Challah/{session_name}/{session_name}_{stream_id[:-3]}/')
+            local_probeFolder = Path('C:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Inputs') / Path(*probeFolder.parts[1:]) #useful if you run the find saturation function
+            #local_probeFolder = Path(f'D:/CSV_Saturation/F2302_Challah/{session_name}/{session_name}_{stream_id[:-3]}/')
             recording = si.read_spikeglx(probeFolder, stream_id=stream_id)  # for uncompressed
             recording = spikeglx_preprocessing(recording, doRemoveBadChannels=doRemoveBadChannels,
                                                skipStuffThatKSGUIDoes=skipStuffThatKSGUIDoes,
