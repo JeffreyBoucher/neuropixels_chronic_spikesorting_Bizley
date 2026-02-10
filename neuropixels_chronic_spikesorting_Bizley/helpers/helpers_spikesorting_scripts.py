@@ -162,6 +162,22 @@ def getchanmapnames_andmove(datadir, ferret):
 
     return bigdict
 
+def getSessionsWithinMap(SessionsInOrder,session_path,stream_id,channel_map_to_use):
+    sessionsWithinMap = []
+    for i,session in enumerate(SessionsInOrder):
+        session_name = session.name
+        dp = session_path / session_name
+        chan_dict = get_channelmap_names(dp)
+        if (session_name + "_" + stream_id[:-3]) in chan_dict:
+            if any(v == channel_map_to_use for v in chan_dict.values()):
+                sessionsWithinMap.append(session)
+        else:
+            print('a bug you should solve')
+            pass
+    return sessionsWithinMap
+
+
+
 #def checkDriftCorrection(recording):
     # This is a function which will perform and plot the kilosort drift correction, primarily for visualization.
     # The preprocesing should aleady be done; the ideal place to check is right before the sorting algorithm is

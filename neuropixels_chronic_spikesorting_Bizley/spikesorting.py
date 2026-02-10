@@ -38,7 +38,7 @@ def spikeglx_visualize(recording):
     w_ts2 = sw.plot_timeseries(recording, time_range=spikeViewRegion, clim=(-20, 20))
     plt.show()
     fakey = 1 + 1
-def spikeglx_preprocessing(recording,doRemoveBadChannels =1,skipStuffThatKSGUIDoes = 0,local_probeFolder=None,badChannelList=[], addNoiseForMotionCorrection=1,bin_s_sessionCat=6.0,silenceOrNoiseReplace='noise'):
+def spikeglx_preprocessing(recording,doRemoveBadChannels =1,skipStuffThatKSGUIDoes = 0,local_probeFolder=None,badChannelList=[],bin_s_sessionCat=6.0,silenceOrNoiseReplace='noise'):
     recording = si.phase_shift(recording) #mandatory for NP recordings because the channels are not sampled at the same time.
     windowsToSilenceArray = nullify_saturations(recording, local_probeFolder=local_probeFolder) # find saturations before any further processing. Only finds, doesn't correct.
 
@@ -48,6 +48,8 @@ def spikeglx_preprocessing(recording,doRemoveBadChannels =1,skipStuffThatKSGUIDo
         #recording = recording.remove_channels(bad_channel_ids) # I don't want to remove them here because I am concatenating. Remove later
         new_channel_ids = recording.channel_ids[~np.in1d(recording.channel_ids, recording.channel_ids[badChannelList])]
         recording = si.channelslice.ChannelSliceRecording(recording, new_channel_ids)
+    ### at roughly this spot, I should save raw data locally. Need to consider whether I also want any other preprocessing, but I don't think so.
+
     if not skipStuffThatKSGUIDoes: # I actually might move this to after the concatenation?
         recording = si.bandpass_filter(recording, freq_min=300, freq_max=6000) # filter each
         if False: # here I do peak detection and localization early because it is quicker with one session... I do this to test a processing method.
@@ -112,14 +114,6 @@ def spikeglx_preprocessing(recording,doRemoveBadChannels =1,skipStuffThatKSGUIDo
         else:
             recording = si.silence_periods(recording, windowsToSilenceArray, mode=silenceOrNoiseReplace) # Doing this before whitening might cause issues... I need to understand how whitening works better.
         # recording = recording.astype('int16') ### reportedly converting back in this way is dangerous, and I should look into it. I need to do it for harddrive space, but otherwise I shouldn't bother.
-    if addNoiseForMotionCorrection:
-        pad_size, pad_bounds = size_pad_to_add(recording,bin_s_sessionCat)
-        padRecording = recording.frame_slice(0,pad_size)
-        recording = si.concatenate_recordings([recording, padRecording])
-        if global_configs.useBugFixedSilencePeriods:
-            recording = silence_periods_file.silence_periods(recording, [[pad_bounds[0],recording.get_num_frames()]], mode=silenceOrNoiseReplace)
-        else:
-            recording = si.silence_periods(recording, [[pad_bounds[0],recording.get_num_frames()]], mode=silenceOrNoiseReplace)
     # spikeglx_visualize(recording)
     return recording
 
