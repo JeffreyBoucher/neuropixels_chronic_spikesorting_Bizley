@@ -20,7 +20,7 @@ import neuropixels_chronic_spikesorting_Bizley.all_VE_config as all_VE_config # 
 
 def main():
 
-    ## below two maybe temporary, may be moved to a config file soon.
+    ## below four maybe temporary, may be moved to a config file soon.
     runSessionLoop = True # Also controls saveMultirecInfoFile and doSpikesorting
     saveMultirecInfoFile = True
     doSpikeSorting = False
