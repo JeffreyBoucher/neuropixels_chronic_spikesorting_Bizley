@@ -162,19 +162,21 @@ def getchanmapnames_andmove(datadir, ferret):
 
     return bigdict
 
-def getSessionsWithinMap(SessionsInOrder,session_path,stream_id,channel_map_to_use):
-    sessionsWithinMap = []
-    for i,session in enumerate(SessionsInOrder):
+def getSessionsWithinMap(NAS_SessionsInOrder,session_path,stream_id,channel_map_to_use,Local_SessionsInOrder):
+    NAS_sessionsWithinMap = []
+    Local_SessionsWithinMap = []
+    for i,session in enumerate(NAS_SessionsInOrder):
         session_name = session.name
         dp = session_path / session_name
         chan_dict = get_channelmap_names(dp)
         if (session_name + "_" + stream_id[:-3]) in chan_dict:
             if any(v == channel_map_to_use for v in chan_dict.values()):
-                sessionsWithinMap.append(session)
+                NAS_sessionsWithinMap.append(session)
+                Local_SessionsWithinMap.append(Local_SessionsInOrder[i]) ### in order for this to work the NAS and the local need to fully match... I have enforced this earlier.
         else:
             print('a bug you should solve')
             pass
-    return sessionsWithinMap
+    return NAS_sessionsWithinMap,Local_SessionsWithinMap
 
 
 

@@ -26,12 +26,14 @@ if all_VE_config.generalSpikesortingArguments == 'JeffreyRecommended':
     desired_n_jobs = 16
     si.set_global_job_kwargs(n_jobs=desired_n_jobs)
     doRemoveBadChannels = 1  # currently uses the manual list...
-    skipStuffThatKSGUIDoes = 0  # KS GUI does CAR and bandpass filter and it is a bit opaque how to turn off the latter.
+    skipStuffThatKSGUIDoes = 1  # KS GUI does CAR and bandpass filter and it is a bit opaque how to turn off the latter.
+
+
 
 if all_VE_config.sessionwiseDriftCorrectionArguments == 'JeffreyRecommended': # contains si arguments. Likely to be nonspecific.
 
     bin_s_sessionCat = 6.0 # 6 is best. It is the only way I've managed to get something that looks good. Possibly eventually we will want to do this per-week though.
-    silenceOrNoiseReplace_sessionwise = 'zeros' # zeros is faster, 'noise' makes more sense theoretically but practically doesn't seem much different
+    silenceOrNoiseReplace_sessionwise = 'zeros' # zeros is significantly faster, 'noise' makes more sense theoretically but practically doesn't seem much different
     if silenceOrNoiseReplace_sessionwise == 'silence': silenceOrNoiseReplace = 'zeros' # foolproofing
 
 if all_VE_config.withinSessionSpikesortingArguments == 'JeffreyRecommended':
@@ -41,12 +43,12 @@ if all_VE_config.withinSessionSpikesortingArguments == 'JeffreyRecommended':
 ###### SAVING PARAMETERS SPIKESORTING
 
 if all_VE_config.projectLabel == 'Jeffrey': # arguments handling how much code to run
-    doPreprocessing = 0 # if you want to load your drift maps without recalculating them, turn this off.
+    doPreprocessing = 1 # if you want to load your drift maps without recalculating them, turn this off.
     savePreprocessing = 1
-    overwritePreprocessing = 1
+    overwritePreprocessing = 0
     resaveMotionIfLoadingPreprocessing = 1 # if you turn off preprocessing, you can either resave new motion correction stuff or not. Kapt off my default for safety.
     checkMotionPlotsOnline = 0 # turn this off if you don't want to view the plots.
-    calculateSessionMotionDisplacement = 1 # will probably never be turned off, since this is the whole point of the code.
+    calculateSessionMotionDisplacement = 1 # Decides whether to calculate motion displacement when running get_drift_per_session. Should never not be on.
     testingThings = 0
     if testingThings:
         print('WARNING WARNING TESTING TESTING')
@@ -64,18 +66,34 @@ if all_VE_config.projectLabel == 'Jeffrey': # arguments handling how much code t
 
 ###### Reorder sessions and prep loop.
 
-if all_VE_config.projectLabel == 'Jeffrey': # finds my sessions on the NAS, sorts them in order, then initializes the SetsOfConcatenatedSessions. I recommend using sort_np_sessions, it is useful for getting things in order.
-    SessionsInOrder = sort_np_sessions(list(all_VE_config.session_path.glob(all_VE_config.sessionString)))
-    SetsOfConcatenatedSessions = []
+if all_VE_config.projectLabel == 'Jeffrey': # finds my sessions, sorts them in order, then initializes the Local_SetsOfConcatenatedSessions. I recommend using sort_np_sessions, it is useful for getting things in order.
+    if any(list(all_VE_config.NAS_session_path.glob(all_VE_config.sessionString))):
+        NAS_SessionsInOrder = sort_np_sessions(list(all_VE_config.NAS_session_path.glob(all_VE_config.sessionString)))
+    else:
+        NAS_SessionsInOrder = [[]] ### possibly in this case whatever is running doesn't need the NAS... Not sure if I want to allow it or not, but if not, then this will simply be a deferred error
+    if any(list(all_VE_config.session_path.glob(all_VE_config.sessionString))):
+        Local_SessionsInOrder = sort_np_sessions(list(all_VE_config.session_path.glob(all_VE_config.sessionString)))
+    elif any(NAS_SessionsInOrder):
+        Local_SessionsInOrder = []
+        for i, session in enumerate(NAS_SessionsInOrder): ### here, we make the folder hierarchy from scratch. We even make the directories.
+            Local_SessionsInOrder.append(all_VE_config.local_session_path / Path(*session.parts[-1:]))
+            Local_SessionsInOrder[i].mkdir(parents=True, exist_ok=True)
+    else:
+        Local_SessionsInOrder = [[]] ### This state really should never be reached.
+
+    if not (len(Local_SessionsInOrder) == len(NAS_SessionsInOrder)):
+        print('local and nas sessions not equivalent for some reason, and they should be. Figure it out or recreate the local from scratch.')
+        breakitonpurpose
+    Local_SetsOfConcatenatedSessions = []
 
 
-if all_VE_config.frequencyOfConcatenation == 'weekly_heuristic':
+if all_VE_config.frequencyOfConcatenation == 'weekly_heuristic': ### currently no NAS_SetsOfConcatenatedSessions implemented. So broken till then. Not a priority though.
     ## aggregate sessions as long as they are less than two days apart. It will fail only to catch if I skep two weekdays. I still need to deal with month though.
     tempPerWeek = []
     countOfConcatenatedSessions = 1  # counting from 1
     week_session_correspondance = []
     week = 0
-    for i, session in enumerate(SessionsInOrder):
+    for i, session in enumerate(Local_SessionsInOrder):
         session_name = session.name
         if not i:
             priorDay = int(session_name[0:2])
@@ -96,14 +114,14 @@ if all_VE_config.frequencyOfConcatenation == 'weekly_heuristic':
                 else:
                     priorDaysInMonth = 28
                 if ((currentDay + priorDaysInMonth) - priorDay) > 2:
-                    SetsOfConcatenatedSessions.append(tempPerWeek)
+                    Local_SetsOfConcatenatedSessions.append(tempPerWeek)
                     tempPerWeek = []
                     tempPerWeek.append(session)
                     countOfConcatenatedSessions += 1
                 else:
                     tempPerWeek.append(session)
             elif (currentDay - priorDay) > 2:  ## in this case, week is over
-                SetsOfConcatenatedSessions.append(tempPerWeek)
+                Local_SetsOfConcatenatedSessions.append(tempPerWeek)
                 tempPerWeek = []
                 tempPerWeek.append(session)
                 countOfConcatenatedSessions += 1
@@ -112,9 +130,10 @@ if all_VE_config.frequencyOfConcatenation == 'weekly_heuristic':
             priorDay = currentDay
             priorMonth = int(session_name[2:4])
             priorYear = int(session_name[4:8])
-    SetsOfConcatenatedSessions.append(tempPerWeek)  # this means that the final week will be appended, I think.
+    Local_SetsOfConcatenatedSessions.append(tempPerWeek)  # this means that the final week will be appended, I think.
 elif all_VE_config.frequencyOfConcatenation == 'do_everything':
-    SetsOfConcatenatedSessions =[SessionsInOrder]
+    NAS_SetsOfConcatenatedSessions =[NAS_SessionsInOrder]
+    Local_SetsOfConcatenatedSessions =[Local_SessionsInOrder]
     sessionSetName = 'everythingAllAtOnce'
 
 ###### stuff from versions of week-driftmapping that might be defunct now
@@ -131,7 +150,7 @@ setsOfSessionsPerGrouping = []
 
 if all_VE_config.make_multirecording_info == 'JeffreyRecommended':
 
-    for sessionSetCount,currentSetOfSessions in enumerate(SetsOfConcatenatedSessions): # first, determine the sessions which require further analysis.
+    for sessionSetCount,currentSetOfSessions in enumerate(NAS_SetsOfConcatenatedSessions): # first, determine the sessions which require further analysis. ### this tells me that yes I do want to create dummy files locally even if I am NAS based
 
         ### Make a file that keeps track of the recording info
         multirec_info = {'name': [],
@@ -152,7 +171,7 @@ if all_VE_config.make_multirecording_info == 'JeffreyRecommended':
             elif (not (all_VE_config.frequencyOfConcatenation == 'weekly_heuristic')) & (not i):
                 sessionSetName = session_name
             print(f'Processing {sessionSetName}')
-            dp = all_VE_config.session_path / session_name
+            dp = all_VE_config.NAS_session_path / session_name
             chan_dict = get_channelmap_names(dp)
             if (session_name + "_" + all_VE_config.stream_id[:-3]) in chan_dict:
                 if any(v == all_VE_config.channel_map_to_use for v in chan_dict.values()):
@@ -163,3 +182,5 @@ if all_VE_config.make_multirecording_info == 'JeffreyRecommended':
 
         if any(sessionsWithinMap):
             setsOfSessionsPerGrouping.append(sessionsWithinMap)
+        elif all_VE_config.SurveyOverride:
+            setsOfSessionsPerGrouping.append(currentSetOfSessions) ### if Survey, map will constantly change and everything should be well-specified, so we don't need to consider map in the same way...

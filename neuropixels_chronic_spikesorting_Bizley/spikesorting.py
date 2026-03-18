@@ -38,16 +38,21 @@ def spikeglx_visualize(recording):
     w_ts2 = sw.plot_timeseries(recording, time_range=spikeViewRegion, clim=(-20, 20))
     plt.show()
     fakey = 1 + 1
-def spikeglx_preprocessing(recording,doRemoveBadChannels =1,skipStuffThatKSGUIDoes = 0,local_probeFolder=None,badChannelList=[],bin_s_sessionCat=6.0,silenceOrNoiseReplace='noise'):
-    recording = si.phase_shift(recording) #mandatory for NP recordings because the channels are not sampled at the same time.
-    windowsToSilenceArray = nullify_saturations(recording, local_probeFolder=local_probeFolder) # find saturations before any further processing. Only finds, doesn't correct.
+def spikeglx_preprocessing(recording,doRemoveBadChannels =1,skipStuffThatKSGUIDoes = 0,local_probeFolder=None,badChannelList=[],bin_s_sessionCat=6.0,skipStuffThatMightBeInPresavedRaw=False,doSaturationReplace=False,silenceOrNoiseReplace='noise'):
+    testThatIStillWantFloat32 = True
+    if not skipStuffThatMightBeInPresavedRaw:
+        recording = si.phase_shift(recording) #mandatory for NP recordings because the channels are not sampled at the same time.
+
+        if doRemoveBadChannels: # next remove bad channels
+            #bad_channel_ids, channel_labels = si.detect_bad_channels(recording) # this seems not as good as I need it to be... Totally misses all my bad channels. Maybe just need to change parameters...
+            #recording = recording.remove_channels(bad_channel_ids) # I don't want to remove them here because I am concatenating. Remove later
+            new_channel_ids = recording.channel_ids[~np.in1d(recording.channel_ids, recording.channel_ids[badChannelList])]
+            recording = si.channelslice.ChannelSliceRecording(recording, new_channel_ids)
 
 
-    if doRemoveBadChannels: # next remove bad channels
-        #bad_channel_ids, channel_labels = si.detect_bad_channels(recording) # this seems not as good as I need it to be... Totally misses all my bad channels. Maybe just need to change parameters...
-        #recording = recording.remove_channels(bad_channel_ids) # I don't want to remove them here because I am concatenating. Remove later
-        new_channel_ids = recording.channel_ids[~np.in1d(recording.channel_ids, recording.channel_ids[badChannelList])]
-        recording = si.channelslice.ChannelSliceRecording(recording, new_channel_ids)
+    if doSaturationReplace: ### moved to after RemoveBadChannels without checking the consequences, but thinking them through, it should be fine.
+        windowsToSilenceArray = nullify_saturations(recording, local_probeFolder=local_probeFolder) # find saturations before any further processing. Only finds, doesn't correct.
+
     ### at roughly this spot, I should save raw data locally. Need to consider whether I also want any other preprocessing, but I don't think so.
 
     if not skipStuffThatKSGUIDoes: # I actually might move this to after the concatenation?
@@ -107,14 +112,17 @@ def spikeglx_preprocessing(recording,doRemoveBadChannels =1,skipStuffThatKSGUIDo
                 plt.show()
                 breakPointSpot = "here"
         recording = si.common_reference(recording, reference='global',operator='median')  # common reference, I think it's much better to do this after removing bad channels. IBL does a spatial highpass with very low cutoff, butI will keep median for now.
-    recording = recording.astype(dtype="float32")
-    if windowsToSilenceArray.any():  # code breaks when no saturation
-        if global_configs.useBugFixedSilencePeriods:
-            recording = silence_periods_file.silence_periods(recording, windowsToSilenceArray, mode=silenceOrNoiseReplace)
-        else:
-            recording = si.silence_periods(recording, windowsToSilenceArray, mode=silenceOrNoiseReplace) # Doing this before whitening might cause issues... I need to understand how whitening works better.
-        # recording = recording.astype('int16') ### reportedly converting back in this way is dangerous, and I should look into it. I need to do it for harddrive space, but otherwise I shouldn't bother.
-    # spikeglx_visualize(recording)
+    if not testThatIStillWantFloat32:
+        if not (recording.dtype == 'float32'):
+            recording = recording.astype(dtype="float32")
+    if doSaturationReplace:
+        if windowsToSilenceArray.any():  # code breaks when no saturation
+            if global_configs.useBugFixedSilencePeriods:
+                recording = silence_periods_file.silence_periods(recording, windowsToSilenceArray, mode=silenceOrNoiseReplace)
+            else:
+                recording = si.silence_periods(recording, windowsToSilenceArray, mode=silenceOrNoiseReplace) # Doing this before whitening might cause issues... I need to understand how whitening works better.
+            # recording = recording.astype('int16') ### reportedly converting back in this way is dangerous, and I should look into it. I need to do it for harddrive space, but otherwise I shouldn't bother.
+        # spikeglx_visualize(recording)
     return recording
 
 def nullify_saturations(recording,surrondingToAlsoNullify=100,local_probeFolder=None):

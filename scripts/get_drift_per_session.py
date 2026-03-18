@@ -24,6 +24,8 @@ from neuropixels_chronic_spikesorting_Bizley.spikesorting import spikesorting_pi
 from neuropixels_chronic_spikesorting_Bizley.helpers.npyx_metadata_fct import load_meta_file
 
 def main():
+    ## should put this in outerLoopConfigs
+    doSaturationReplace = True
 
     for sessionSetCount,currentSetOfSessions in enumerate(outerLoopConfigs.setsOfSessionsPerGrouping): #with weekly heuristic, each current set of session is a list of path objects
         if not all_VE_config.sessionsToDo == 'all':
@@ -50,21 +52,21 @@ def main():
                 sessionSetName = session_name
             print(f'Processing {sessionSetName}')
             working_dir = all_VE_config.output_folder / 'tempDir' / all_VE_config.ferret / session_name
-            dp = all_VE_config.session_path / session_name
-            chan_dict = get_channelmap_names(dp)  # almost works but something about the format is different. no "imRoFile" perameter. There is something called an "imRoTable" which is probably also what I want. But let's deal with this later, when we know we need it. Because, honestly, we want something more sophisticated than this eventually.
+            NAS_currentDataPath = all_VE_config.NAS_session_path / session_name
+            chan_dict = get_channelmap_names(NAS_currentDataPath)  # almost works but something about the format is different. no "imRoFile" perameter. There is something called an "imRoTable" which is probably also what I want. But let's deal with this later, when we know we need it. Because, honestly, we want something more sophisticated than this eventually.
             chan_map_name = chan_dict[session_name + "_" + all_VE_config.stream_id[:-3]]
             if (not (chan_map_name == all_VE_config.channel_map_to_use)):
                 print('But not really, because of the probe map')
                 print('this currently handles weeks where I switch maps very badly!')
                 sessionLoopBreakFlag = True
                 break
-            probeFolder = list(dp.glob('*' + all_VE_config.stream_id[:-3]))
+            probeFolder = list(NAS_currentDataPath.glob('*' + all_VE_config.stream_id[:-3]))
             probeFolder = probeFolder[0]
             if outerLoopConfigs.doPreprocessing:
                 # recording = si.read_cbin_ibl(probeFolder)  # for compressed
-                local_probeFolder = all_VE_config.saturatedZonesLocations / Path(*probeFolder.parts[1:])
+                local_probeFolder = all_VE_config.local_session_path / Path(*probeFolder.parts[-2:])
                 recording = si.read_spikeglx(probeFolder, stream_id=all_VE_config.stream_id) # for uncompressed
-                recording = spikeglx_preprocessing(recording, doRemoveBadChannels=outerLoopConfigs.doRemoveBadChannels,skipStuffThatKSGUIDoes=outerLoopConfigs.skipStuffThatKSGUIDoes,local_probeFolder=local_probeFolder,badChannelList=all_VE_config.badChannelList,bin_s_sessionCat=outerLoopConfigs.bin_s_sessionCat,silenceOrNoiseReplace=outerLoopConfigs.silenceOrNoiseReplace_sessionwise)
+                recording = spikeglx_preprocessing(recording, doRemoveBadChannels=outerLoopConfigs.doRemoveBadChannels,skipStuffThatKSGUIDoes=outerLoopConfigs.skipStuffThatKSGUIDoes,local_probeFolder=local_probeFolder,badChannelList=all_VE_config.badChannelList,bin_s_sessionCat=outerLoopConfigs.bin_s_sessionCat,doSaturationReplace=doSaturationReplace,silenceOrNoiseReplace=outerLoopConfigs.silenceOrNoiseReplace_sessionwise)
                 ### do things related to the construction of a file which stores the recording information.
                 outerLoopConfigs.multirec_info['name'].append(session_name)
                 outerLoopConfigs.multirec_info['fs'].append(recording.get_sampling_frequency())
@@ -396,19 +398,14 @@ def main():
 
         else:
 
-            if doPreprocessing:
+            if outerLoopConfigs.doPreprocessing:
                 ### recent stuff to hide with ifs later
                 ### motion correction
 
-                job_kwargs = dict(chunk_duration='1s',n_jobs=desired_n_jobs,progress_bar=True) #,
-                ### KS defaults, which I am using
-                if testingThings:
-                    peaks = detect_peaks(recording=multirecordingInput, method="locally_exclusive", peak_sign="neg",
+                job_kwargs = dict(chunk_duration='1s',n_jobs=outerLoopConfigs.desired_n_jobs,progress_bar=True) #,
+                ### ks defaults and also a permissive-ish threshold of 5.0.
+                peaks = detect_peaks(recording=multirecordingInput, method="locally_exclusive", peak_sign="neg",
                                          detect_threshold=5.0, exclude_sweep_ms=0.1, radius_um=50,
-                                         **job_kwargs)  # seems like there isn't a unique peak detection algorithm for ks? I don't actually think that's true, I believe they use templates... But with SI, maybe not. I should maybe just look into the high level function and see what is done
-                else:
-                    peaks = detect_peaks(recording=multirecordingInput, method="locally_exclusive", peak_sign="neg",
-                                         detect_threshold=8.0, exclude_sweep_ms=0.1, radius_um=50,
                                          **job_kwargs)  # seems like there isn't a unique peak detection algorithm for ks? I don't actually think that's true, I believe they use templates... But with SI, maybe not. I should maybe just look into the high level function and see what is done
                 peak_locations = localize_peaks(recording=multirecordingInput, peaks=peaks, method="grid_convolution",
                                                 weight_method={"mode": "gaussian_2d",
@@ -480,7 +477,7 @@ def main():
                             pickle.dump(pickleJar, file)
 
             # multirecordingInput = multirecordingInput.save(folder="C:\Jeffrey\Projects\SpeechAndNoise\Spikesorting_Inputs\Preprocessed", n_jobs=10, chunk_duration='1s') # this function removes the extra channel. So 384 instead of 385.
-            if doPreprocessing:
+            if outerLoopConfigs.doPreprocessing:
                 df_rec = pd.DataFrame(multirec_info)
                 df_rec.to_csv(phy_folder / 'multirec_info.csv',
                               index=False)  # this is the earliest phy folder around and may be a problem...
