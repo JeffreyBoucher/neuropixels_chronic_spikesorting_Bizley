@@ -31,5 +31,6 @@ dependencies:
     - spikeinterface[full,widgets]
     - spikeinterface-gui
     - tridesclous
+    - mtscomp # untested in the yml
      # you need to install kilosort as a seperate command for some reason, or it won't work. pip install kilosort --upgrade
     # - phy==2.0b5

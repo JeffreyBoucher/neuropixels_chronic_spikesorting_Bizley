@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 import numpy as np
 import spikeinterface.full as si
 import matplotlib.pyplot as plt
@@ -8,7 +9,8 @@ import neuropixels_chronic_spikesorting_Bizley.externalBugFixes.spike_interface.
 import neuropixels_chronic_spikesorting_Bizley.config as global_configs
 import torch
 import pickle
-
+import shutil
+import subprocess
 
 def spikeglx_visualize(recording):
     #At the moment, a function designed to be break-pointed into.
@@ -38,8 +40,87 @@ def spikeglx_visualize(recording):
     w_ts2 = sw.plot_timeseries(recording, time_range=spikeViewRegion, clim=(-20, 20))
     plt.show()
     fakey = 1 + 1
-def spikeglx_preprocessing(recording,doRemoveBadChannels =1,skipStuffThatKSGUIDoes = 0,local_probeFolder=None,badChannelList=[],bin_s_sessionCat=6.0,skipStuffThatMightBeInPresavedRaw=False,doSaturationReplace=False,silenceOrNoiseReplace='noise'):
-    testThatIStillWantFloat32 = True
+
+def makeAndProcessRaw(NAS_session_path,session_name,stream_id,local_session_path,badChannelList,catgt_location,rawFolderName,overwriteRaw = False,createCompressed = False):
+
+
+    # catgt_command = catgt.dry_run()  ### dry_run() generates a string for you. Look at it if you want to check.
+    dir_string = '-dir=' + str(NAS_session_path) ### this should be all_VE_config.NAS_session_path, though I passed it as an argument instead of importing. It specifies where the file should come from.
+    run_string = '-run=' + session_name[:-3] ### this is the name of the session folder, without the _g#.
+    prb_string = '-prb=' + stream_id[-4] ### the imec number of the probe.
+    g_string = '-g=' + session_name[-1] ### the number next to g. Almost always 0, unless an error happened.
+    dest_string = '-dest=' + str(local_session_path)
+    CMR_string = '-gbldmx' ### Rebecca, you can use loccar_um to do a local car. Also, if you want to do nothing, make this ''.
+
+
+    ## make -save string, which is a bit more involved... This is the thing that remove bad channels.
+    js = '2'  ### 2 for AP, 3 for LF apparently. look up the documentation for -save in catgt.
+    out_streamid_num = stream_id[-4]  ### I will want this to be the same, perhaps you won't.
+    channelsToKeep_listStyle = np.setdiff1d(np.arange(0, 385), np.asarray(badChannelList)).tolist() ### includes the 385th channel intentionally
+    channelsToKeepString = str(channelsToKeep_listStyle)[1:-1].replace(" ", "") ### I list them all one by one, excluding the ones we said to exclude.
+    save_string = '-save=' + js + ',' + prb_string[-1] + ',' + out_streamid_num + ',' + channelsToKeepString ### the "-save" argument wants you to put js, in-imec-num, out-imec-num first before all the channels you want to save.
+    chnexcl_string = '-chnexcl={'+stream_id[-4]+';'+str(badChannelList)[1:-1].replace(" ", "")+'} ' ### we also need to say we are excluding channels, because they do seperate things. save_string is about which channels you save, but this one is about which channels are exlcuded from thing like the CAR.
+
+    catgt_command = 'runit.bat ' + dir_string + ' ' + run_string + ' ' + g_string + ' ' + '-t=0 -ap' + ' ' + prb_string + ' ' + dest_string + ' -prb_fld ' + chnexcl_string + save_string + ' ' + CMR_string
+
+    catgt_output_folder_path = local_session_path / Path('catgt_' + session_name)
+
+    if catgt_output_folder_path.exists():
+        shutil.rmtree(catgt_output_folder_path) ### if an error happens, this folder may already exist... I believe it makes things hang when you allow it...
+
+
+    run_in_path = str(catgt_location) + '\\' + catgt_command
+    subprocess.Popen(run_in_path).wait() ### this actually runs the command.
+
+    pass
+
+    ### then compress
+    ## catgt will have saved everything you want in a folder that looks like your target, except with catgt_ in front. We will compress from that folder, then delete the catgt folder.
+
+    ## load an si recording as an easy way to get the metadata.
+    ### currently doesn't work... Will double check if I need it to work (as possibly I will still have this problem after I compress)
+    #recording = si.read_spikeglx(catgt_output_folder_path, stream_id=stream_id) ### streamid will only work if you didn't change it... If you changed your output id, figure out how to make this work.
+    found_SR = 30000 ### not found yet. All mine (Jeff's) are currently 30000 though. There was a bug with spikeinterface that made it so I couldn't load through that, but it was possibly fixed in vesion 104. Also there exists code to read meta files, obviously. Some I can rob is in my later VE...
+
+
+    binFileFullpath = list(catgt_output_folder_path.glob('*.bin'))[0] ### only should work if there is one bin file, but there always should be in normal use.
+    metaFileFullpath = list(catgt_output_folder_path.glob('*.meta'))[0]
+
+
+
+    if createCompressed:
+        mtscomp_command = 'mtscomp ' + str(binFileFullpath) + ' -n ' + str(len(channelsToKeep_listStyle)) + ' -s ' + str(found_SR) + ' -d int16'
+        subprocess.Popen(mtscomp_command).wait()
+
+    ### then delete the raw that existed before compression
+        ### (let's not actually do this to start with, I want to compare them...)
+    ### then move everything remaining in the folder
+    if overwriteRaw&rawFolderName.exists():
+        shutil.rmtree(rawFolderName) ### this looks scary but the data we just created is in a different folder. We delete whatever is already in the place we want to move that
+    else:
+        pass ### haven't written the skip yet because I am not sure how I want to do it. By passing, you'll get an error if you don't overwrite. I imagine what I would want to do is check that the file has actually been created properly before skipping (just checking if the folder exists wouldn't do that)
+    os.rename(catgt_output_folder_path,rawFolderName)
+
+def spikeglx_preprocessing(recording,local_probeFolder=None,doSaturationReplace=False,silenceOrNoiseReplace='noise',floatDataTypeForDriftCorrection=False):
+
+    if doSaturationReplace: ### should consider trying to get this into the local raw via catgt instead of doing it here?
+        windowsToSilenceArray = nullify_saturations(recording, local_probeFolder=local_probeFolder) # find saturations before any further processing. Only finds, doesn't correct.
+
+    if floatDataTypeForDriftCorrection:
+        if not (recording.dtype == 'float32'):
+            recording = recording.astype(dtype="float32")
+    if doSaturationReplace:
+        if windowsToSilenceArray.any():  # code breaks when no saturation
+            if global_configs.useBugFixedSilencePeriods:
+                recording = silence_periods_file.silence_periods(recording, windowsToSilenceArray, mode=silenceOrNoiseReplace)
+            else:
+                recording = si.silence_periods(recording, windowsToSilenceArray, mode=silenceOrNoiseReplace) # Doing this before whitening might cause issues... I need to understand how whitening works better.
+            # recording = recording.astype('int16') ### reportedly converting back in this way is dangerous, and I should look into it. I need to do it for harddrive space, but otherwise I shouldn't bother.
+        # spikeglx_visualize(recording)
+    return recording
+
+
+def spikeglx_preprocessing_historical(recording,doRemoveBadChannels =1,skipStuffThatKSGUIDoes = 0,local_probeFolder=None,badChannelList=[],bin_s_sessionCat=6.0,skipStuffThatMightBeInPresavedRaw=False,doSaturationReplace=False,silenceOrNoiseReplace='noise',floatDataTypeForDriftCorrection=False):
     if not skipStuffThatMightBeInPresavedRaw:
         recording = si.phase_shift(recording) #mandatory for NP recordings because the channels are not sampled at the same time.
 
@@ -112,7 +193,7 @@ def spikeglx_preprocessing(recording,doRemoveBadChannels =1,skipStuffThatKSGUIDo
                 plt.show()
                 breakPointSpot = "here"
         recording = si.common_reference(recording, reference='global',operator='median')  # common reference, I think it's much better to do this after removing bad channels. IBL does a spatial highpass with very low cutoff, butI will keep median for now.
-    if not testThatIStillWantFloat32:
+    if floatDataTypeForDriftCorrection:
         if not (recording.dtype == 'float32'):
             recording = recording.astype(dtype="float32")
     if doSaturationReplace:

@@ -12,32 +12,35 @@ import neuropixels_chronic_spikesorting_Bizley.all_VE_config as all_VE_config # 
 
 ###### all project-specific outer loop variables should be handled by this file. ##########
 
+if all_VE_config.projectLabel == 'Jeffrey':
+    if all_VE_config.computerUsed == 'JeffreyLabDesktop':
+        catgt_location = Path('C:/Users/jeff/PycharmProjects/neuropixels_chronic_spikesorting_Bizley/CatGT-win') # should be local to the VE, but absolute paths are nice.
 
 ###### PLOTTING PARAMETERS
 
 if all_VE_config.plottingArguments == 'JeffreyRecommended':
-    matplotlibGUItype = 'TkAgg'
+    matplotlibGUItype = 'TkAgg' # my preferred plotting gui at the moment. One of the first i tried. It isn't that good though.
 
-    matplotlib.use(matplotlibGUItype) # my preferred plotting gui at the moment. One of the first i tried.
+    matplotlib.use(matplotlibGUItype)
 
 ###### SPIKESORTING PARAMETERS
 
 if all_VE_config.generalSpikesortingArguments == 'JeffreyRecommended':
-    desired_n_jobs = 16
+    desired_n_jobs = 16 # this is where you can set up parallel processing. -1 for all available cores. Sometimes some code breaks when you try to parallel process; you can set to 1 to bypass those problems in exchange for things running slow.
     si.set_global_job_kwargs(n_jobs=desired_n_jobs)
-    doRemoveBadChannels = 1  # currently uses the manual list...
-    skipStuffThatKSGUIDoes = 1  # KS GUI does CAR and bandpass filter and it is a bit opaque how to turn off the latter.
+    doRemoveBadChannels = 1  # currently uses the manual list... I doubt you'll ever want to turn this off.
+    skipStuffThatKSGUIDoes = 1  # this variable is fundamentally outdated at this point and will either be irrelevant if you see this, or deleted if you don't.
 
 
 
 if all_VE_config.sessionwiseDriftCorrectionArguments == 'JeffreyRecommended': # contains si arguments. Likely to be nonspecific.
 
     bin_s_sessionCat = 6.0 # 6 is best. It is the only way I've managed to get something that looks good. Possibly eventually we will want to do this per-week though.
-    silenceOrNoiseReplace_sessionwise = 'zeros' # zeros is significantly faster, 'noise' makes more sense theoretically but practically doesn't seem much different
+    silenceOrNoiseReplace_sessionwise = 'zeros' # zeros is significantly faster, 'noise' makes more sense theoretically but practically doesn't seem much different. Might work better with new SI version?
     if silenceOrNoiseReplace_sessionwise == 'silence': silenceOrNoiseReplace = 'zeros' # foolproofing
 
 if all_VE_config.withinSessionSpikesortingArguments == 'JeffreyRecommended':
-    silenceOrNoiseReplace_within = 'zeros' # have not tried zeros in actual spikesorting.
+    silenceOrNoiseReplace_within = 'zeros' # have not systematically evaluated differences wrt spikesorting.
     if silenceOrNoiseReplace_within == 'silence': silenceOrNoiseReplace = 'zeros' # foolproofing
 
 ###### SAVING PARAMETERS SPIKESORTING
@@ -45,8 +48,8 @@ if all_VE_config.withinSessionSpikesortingArguments == 'JeffreyRecommended':
 if all_VE_config.projectLabel == 'Jeffrey': # arguments handling how much code to run
     doPreprocessing = 1 # if you want to load your drift maps without recalculating them, turn this off.
     savePreprocessing = 1
-    overwritePreprocessing = 0
-    resaveMotionIfLoadingPreprocessing = 1 # if you turn off preprocessing, you can either resave new motion correction stuff or not. Kapt off my default for safety.
+    overwritePreprocessing = 1
+    resaveMotionIfLoadingPreprocessing = 0 # if you turn off preprocessing, you can either resave new motion correction stuff or not. Kept off by default for safety.
     checkMotionPlotsOnline = 0 # turn this off if you don't want to view the plots.
     calculateSessionMotionDisplacement = 1 # Decides whether to calculate motion displacement when running get_drift_per_session. Should never not be on.
     testingThings = 0
@@ -71,15 +74,15 @@ if all_VE_config.projectLabel == 'Jeffrey': # finds my sessions, sorts them in o
         NAS_SessionsInOrder = sort_np_sessions(list(all_VE_config.NAS_session_path.glob(all_VE_config.sessionString)))
     else:
         NAS_SessionsInOrder = [[]] ### possibly in this case whatever is running doesn't need the NAS... Not sure if I want to allow it or not, but if not, then this will simply be a deferred error
-    if any(list(all_VE_config.session_path.glob(all_VE_config.sessionString))):
-        Local_SessionsInOrder = sort_np_sessions(list(all_VE_config.session_path.glob(all_VE_config.sessionString)))
-    elif any(NAS_SessionsInOrder):
+    if any(NAS_SessionsInOrder): ### if you have NAS stuff... We are going to assume either you have local stuff or you want to create it.
         Local_SessionsInOrder = []
         for i, session in enumerate(NAS_SessionsInOrder): ### here, we make the folder hierarchy from scratch. We even make the directories.
             Local_SessionsInOrder.append(all_VE_config.local_session_path / Path(*session.parts[-1:]))
             Local_SessionsInOrder[i].mkdir(parents=True, exist_ok=True)
+    elif any(list(all_VE_config.local_session_path.glob(all_VE_config.sessionString))): ### If you don't have NAS stuff, maybe you have untouched data locally?
+        Local_SessionsInOrder = sort_np_sessions(list(all_VE_config.local_session_path.glob(all_VE_config.sessionString)))
     else:
-        Local_SessionsInOrder = [[]] ### This state really should never be reached.
+        Local_SessionsInOrder = [[]] ### This state really should never be reached, and should break the code if you do.
 
     if not (len(Local_SessionsInOrder) == len(NAS_SessionsInOrder)):
         print('local and nas sessions not equivalent for some reason, and they should be. Figure it out or recreate the local from scratch.')
@@ -87,7 +90,7 @@ if all_VE_config.projectLabel == 'Jeffrey': # finds my sessions, sorts them in o
     Local_SetsOfConcatenatedSessions = []
 
 
-if all_VE_config.frequencyOfConcatenation == 'weekly_heuristic': ### currently no NAS_SetsOfConcatenatedSessions implemented. So broken till then. Not a priority though.
+if all_VE_config.frequencyOfConcatenation == 'weekly_heuristic': ### a currently unused system where one can batch-run many sets of sessions. The idea here was to, for example, concatenate every week within itself but not between weeks. I'll probably reuse some of this code to make three-week chunks eventually.
     ## aggregate sessions as long as they are less than two days apart. It will fail only to catch if I skep two weekdays. I still need to deal with month though.
     tempPerWeek = []
     countOfConcatenatedSessions = 1  # counting from 1
@@ -136,7 +139,7 @@ elif all_VE_config.frequencyOfConcatenation == 'do_everything':
     Local_SetsOfConcatenatedSessions =[Local_SessionsInOrder]
     sessionSetName = 'everythingAllAtOnce'
 
-###### stuff from versions of week-driftmapping that might be defunct now
+###### stuff from versions of week-driftmapping that might be defunct now (I am basically certain it is)
 
 record_motion_sessions = []
 record_motion_weeks = []
@@ -148,7 +151,7 @@ week = 0
 last_session_previous_week = 0
 setsOfSessionsPerGrouping = []
 
-if all_VE_config.make_multirecording_info == 'JeffreyRecommended':
+if all_VE_config.make_multirecording_info == 'JeffreyRecommended': # I try to save probe parameters in a more convenient location early on, because although the information is often available in the spikesorting output, it is annoying and inconsistent to actually extract it. ### That said, not fully certain I use this one and not one inside the main function.
 
     for sessionSetCount,currentSetOfSessions in enumerate(NAS_SetsOfConcatenatedSessions): # first, determine the sessions which require further analysis. ### this tells me that yes I do want to create dummy files locally even if I am NAS based
 

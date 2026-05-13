@@ -8,9 +8,10 @@ SurveyOverride = False
 
 ###### PERSONALIZATION ARGUMENTS ######
 projectLabel = 'Jeffrey' ## put your name or project or something to specify which sets of variables you will access.
+sessionString = '[0-9][0-9]*' # this is a default regular expression to get the correct filesets to analyze.
 
 if projectLabel == 'Jeffrey':
-    computerUsed = 'JeffreyLabDesktop'
+    computerUsed = 'JeffreyLabDesktop' # if you plan to analyze on multiple computers and have different local addresses for things, this is how you can account for that.
 
     # the below are parameters you may want to keep. If you don't, make your own and name it something else.
     sessionwiseDriftCorrectionArguments = 'JeffreyRecommended'
@@ -22,9 +23,11 @@ if projectLabel == 'Jeffrey':
 ###### FERRET AND FILE NAME PARAMETERS
 
 if projectLabel == 'Jeffrey': ### here will be ferret specific arguments
+    ### recordingZones are sets of sessions you want to analyze together, because, for example, they share a probemap and timeframe. Each can have a specific set of parameters associated with it.
+    recordingZone = 'ACx_Boule_top_tipref_March2025'
     #recordingZone = 'PFC_Boule_Borders_Top_GroundrefIThink'
     #recordingZone = 'PFC_Boule_Borders_Top'
-    recordingZone = 'PFC_shank0_Challah'
+    # recordingZone = 'PFC_shank0_Challah'
     #recordingZone = 'PFC_shank3_Challah'
     #recordingZone = "ACx_Challah_top_groundref_June2024"
     # recordingZone = "ACx_Challah_top_groundref_May2024"
@@ -34,18 +37,17 @@ if projectLabel == 'Jeffrey': ### here will be ferret specific arguments
 
 ###### PROBEBANK SPECIFIC PARAMETERS JEFFREY
 
-if projectLabel == 'Jeffrey': # contains probemap specific stuff. Highly specific to my (Jeffrey's) project.
+if projectLabel == 'Jeffrey': # contains probemap specific stuff. First set contains commentary where necessary.
     if recordingZone == 'ACx_Challah_top_groundref_May2024':
-        stream_id = 'imec0.ap'
-        sessionSetLabel = 'All_ACx_Top_groundref_MonthOfMay2024'
-        channel_map_to_use = 'Challah_top_b1_horizontal_band_ground.imro'
+        stream_id = 'imec0.ap' # unreliably identifies the probe. Unfortunately can misidentify when small details change. Currently code relies on it, we need to find ways around it though.
+        sessionSetLabel = 'All_ACx_Top_groundref_MonthOfMay2024' # this will become the folder name for the output, and is also used to create the regular expression that identifies the sessions you want to include.
+        channel_map_to_use = 'Challah_top_b1_horizontal_band_ground.imro' # the name of the channel map. This is a more reliable way of identifying a probe/map, since we don't tend to use the same maps on multiple probes.
         #channel_map_to_use_other_ref = 'Challah_top_b1_horizontal_band_joint_tip.imro' ### this wouldn't actually work...
-        badChannelList = [66,105,149,170,175,209,210,239,354,369]
+        badChannelList = [66,105,149,170,175,209,210,239,354,369] # bad channels, manually found and labeled. These tend to be highly reliable from implant to end-of-experiment. They will be removed from all analyses.
         ferret = 'F2302_Challah'
         ferret_no_id = 'Challah'
-        doMultipleShanks = True
-        sessionSetName = 'everythingAllAtOnce' ### TEMPORARY
-    if recordingZone == 'Challah_Survey':
+        doMultipleShanks = True # this will never not be true and I'll move it elsewhere pretty soon. Because even with one shank, you want to treat it as multiple.
+    elif recordingZone == 'Challah_Survey':
         stream_id = 'imec0.ap' ### imec0.ap for ACx
         sessionSetLabel = 'Challah_Survey_ACx_2026_09_03'
         channel_map_to_use = '' ### don't know how to deal with this yet...
@@ -54,10 +56,9 @@ if projectLabel == 'Jeffrey': # contains probemap specific stuff. Highly specifi
         ferret = 'F2302_Challah'
         ferret_no_id = 'Challah'
         doMultipleShanks = True
-        sessionSetName = 'everythingAllAtOnce' ### TEMPORARY
         SurveyOverride = True
         dateStringToLoadUp = '2026_03_09'
-    if recordingZone == 'ACx_Challah_top_groundref_June2024':
+    elif recordingZone == 'ACx_Challah_top_groundref_June2024':
         stream_id = 'imec0.ap'
         sessionSetLabel = 'All_ACx_Top_groundref_MonthOfJune2024'
         channel_map_to_use = 'Challah_top_b1_horizontal_band_ground.imro'
@@ -66,7 +67,6 @@ if projectLabel == 'Jeffrey': # contains probemap specific stuff. Highly specifi
         ferret = 'F2302_Challah'
         ferret_no_id = 'Challah'
         doMultipleShanks = True
-        sessionSetName = 'everythingAllAtOnce' ### TEMPORARY
     elif recordingZone == 'PFC_shank0_Challah':
         stream_id = 'imec1.ap'
         sessionSetLabel = 'PFC_shank0_MonthOfMay2024'#'PFC_shank0'
@@ -75,7 +75,7 @@ if projectLabel == 'Jeffrey': # contains probemap specific stuff. Highly specifi
         # something else also. Need to read metadata
         ferret = 'F2302_Challah'
         ferret_no_id = 'Challah'
-        doMultipleShanks = False
+        doMultipleShanks = True
     elif recordingZone == 'PFC_shank3_Challah':
         stream_id = 'imec1.ap'
         sessionSetLabel = 'PFC_shank3'
@@ -84,7 +84,7 @@ if projectLabel == 'Jeffrey': # contains probemap specific stuff. Highly specifi
         # something else also. Need to read metadata
         ferret = 'F2302_Challah'
         ferret_no_id = 'Challah'
-        doMultipleShanks = False
+        doMultipleShanks = True
     elif recordingZone == 'ACx_Boule':
         stream_id = 'imec1.ap'
         sessionSetLabel = 'All_ACx_Top'
@@ -92,6 +92,14 @@ if projectLabel == 'Jeffrey': # contains probemap specific stuff. Highly specifi
         # channel_map_to_use_other_ref = ''
         ferret = 'F2301_Boule'
         ferret_no_id = 'Boule'
+    elif recordingZone == 'ACx_Boule_top_tipref_March2025':
+        stream_id = 'imec1.ap'
+        sessionSetLabel = 'All_ACx_Top_tipref_March2025'
+        channel_map_to_use = 'Boule_top_ACx_tipref.imro'
+        badChannelList = [42,116,143,175]
+        ferret = 'F2301_Boule'
+        ferret_no_id = 'Boule'
+        doMultipleShanks = True
     elif recordingZone == 'PFC_Boule_Center_Top':
         stream_id = 'imec0.ap'
         sessionSetLabel = 'PFC_Shanks_1_2'
@@ -116,7 +124,7 @@ if projectLabel == 'Jeffrey': # contains probemap specific stuff. Highly specifi
 
 ###### POSSIBLY REDUNDANT SESSION DRILL-DOWN FOR JEFFREY
 
-if projectLabel == 'Jeffrey': # manages the highest-level selection of sessions via regex. A bit outdated now that session-sets are implemented. I still occasionally try and use it.
+if projectLabel == 'Jeffrey': # manages the highest-level selection of sessions via regex. Something I will eventually rethink, as this is really only suitable for analyzing small, particular sets of sessions and not analyzing everything in bulk.
     if sessionSetLabel == 'All_ACx_Top':
         sessionString = '[0-9][0-9]*' ### this actually selects more than just the top
     elif sessionSetLabel == 'Tens_Of_June':
@@ -125,10 +133,12 @@ if projectLabel == 'Jeffrey': # manages the highest-level selection of sessions 
         sessionString = '1305*'
     elif sessionSetLabel == 'TheFirstSession':
         sessionString = '1305*AM*'
-    elif 'MonthOfMay2024' in sessionSetLabel:
+    elif 'May2024' in sessionSetLabel:
         sessionString = '[0-9][0-9]052024*'
-    elif 'MonthOfJune2024' in sessionSetLabel:
+    elif 'June2024' in sessionSetLabel:
         sessionString = '[0-9][0-9]062024*'
+    elif 'March2025' in sessionSetLabel: ### next time I should automate this in some way or change the infrastructure entirely. Probably instead of doing this month based I want to do it three-week-chunk based, and I already have code for that, it'll just be about moving it.
+        sessionString = '[0-9][0-9]032025*'
     elif SurveyOverride:
         sessionString = dateStringToLoadUp + '*'
     else:
@@ -145,9 +155,6 @@ if projectLabel == 'Jeffrey':
     if SurveyOverride:
         NAS_neural_data = NAS_neural_data / Path('Surveys')
     NAS_session_path = NAS_neural_data / Path(ferret)
-    if True: ### the following are in the process of becoming obsolete. I split things into local and NAS, and prefer to specify this.
-        neural_data = Path('D:/Neuropixels/') ### you will want to use a local thing instead of a NAS thing for read-only reasons and also speed. ### Although, Jeff has now implemented a way to save a phase-corrected raw locally so that might be the way we will prefer to handle it. Load arbitrary data from NAS, resave locally with phase correction, use that...
-        session_path = neural_data / Path(ferret) # bombcell at least doesn't easily work read-only so having a local place for the raw data is better... And honestly this is maybe a good idea anyway, it's faster.
     local_neural_data = Path('D:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Inputs') # I think these are just for saturated zones, though they are in the same format as the folders on the NAS...
     if SurveyOverride:
         local_neural_data = Path('D:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Inputs/Surveys')

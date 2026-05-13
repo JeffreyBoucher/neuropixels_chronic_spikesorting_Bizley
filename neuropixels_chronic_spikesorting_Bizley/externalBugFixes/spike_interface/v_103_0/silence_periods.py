@@ -1,4 +1,4 @@
-#### Jeff has editted this to solve at least one bug. Problem:
+#### Jeff has edited this to solve at least one bug. Problem:
 
 
 from __future__ import annotations

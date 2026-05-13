@@ -15,7 +15,7 @@ import spikeinterface.sortingcomponents.motion as sm
 
 
 from neuropixels_chronic_spikesorting_Bizley.helpers.helpers_spikesorting_scripts import sort_np_sessions, get_channelmap_names, getSessionsWithinMap
-from neuropixels_chronic_spikesorting_Bizley.spikesorting import spikesorting_pipeline, spikesorting_postprocessing, spikeglx_preprocessing
+from neuropixels_chronic_spikesorting_Bizley.spikesorting import spikesorting_pipeline, spikesorting_postprocessing, spikeglx_preprocessing, makeAndProcessRaw
 from neuropixels_chronic_spikesorting_Bizley.helpers.npyx_metadata_fct import load_meta_file
 
 import neuropixels_chronic_spikesorting_Bizley.outerLoopConfigs as outerLoopConfigs
@@ -23,21 +23,20 @@ import neuropixels_chronic_spikesorting_Bizley.all_VE_config as all_VE_config # 
 
 def main():
 
-    ##
+    ## these are a bunch of parameters you should set before running spikesorting which are hopefully named in a self-explanatory way.
     runSessionLoop = True # Also controls saveMultirecInfoFile and doSpikesorting
     saveMultirecInfoFile = True
-    saveRawForPhyOrBombcell = True # use if you want raw data, except excluding bad channels, with phase correction, and being writable. Will make everything take longer and you'll need a local harddrive.
-    overwriteRaw = True # determines if you recreate a raw that is already detected. Set to true if you want to remake it, false otherwise.
-    usePresavedRaw = True # I'm not going to check if it exists, because I want you to set this to false if you don't want this and for you to get an error if you've mistakenly left it on.
-    doSaturationReplace = True
-    doSpikeSorting = False
-    doPostprocessing = False
-    skipStuffThatMightBeInPresavedRaw=False ### A default you should keep False. It will be flipped True when you want it to be.
+    overwriteRaw = False # determines if you recreate a raw that is already detected. Set to true if you want to remake it, false otherwise.
+    createCompressed = False # determines whether you create compressed raw. Good to do if you need the space, but all processing requires unpacking it.
+    doSaturationReplace = False ### in the new version of si this no longer works for confusing reasons...
+    doSpikeSorting = True
+    doPostprocessing = False ### I currently do not use this at all. I left the infrastructure in case you want to do any kind of postprocessing.
+    floatIntoKilosort = True ### I feel like kilosort should work better if you input int16 (because that is the spikeglx format), but historically I have better luck with float... Anyway you can decide whether it is float or int here.
 
     #get sessions within map
     if not all_VE_config.SurveyOverride: ### if not a survey...
         NAS_SessionsWithinMap,Local_SessionsWithinMap = getSessionsWithinMap(outerLoopConfigs.NAS_SessionsInOrder,all_VE_config.NAS_session_path,all_VE_config.stream_id,all_VE_config.channel_map_to_use,outerLoopConfigs.Local_SessionsInOrder) ### possibly this just returns SessionsInOrder in a way resulting from a vestige. It used to get everything, but now... Anyway this can be marked for potential future deletion
-    else:
+    else: ### if survey, the order doesn't actually matter, and they will probably be "in order" anyway.
         NAS_SessionsWithinMap = outerLoopConfigs.NAS_SessionsInOrder
         Local_SessionsWithinMap = outerLoopConfigs.Local_SessionsInOrder
     # session_name = '021122_trifle_pm3_g0'
@@ -60,66 +59,18 @@ def main():
         working_dir = all_VE_config.output_folder / 'tempDir' / all_VE_config.ferret / session_name
         NAS_currentDataPath = all_VE_config.NAS_session_path / session_name
 
-        probeFolder = list(NAS_currentDataPath.glob('*' + all_VE_config.stream_id[:-3]))
+        probeFolder = list(NAS_currentDataPath.glob('*' + all_VE_config.stream_id[:-3])) ### instead of depending on streamid I should read the meta files in both folders and decide based on probemap.
         probeFolder = probeFolder[0]  # name of probe folder
         if runSessionLoop:
-            local_probeFolder = all_VE_config.local_session_path / Path(*probeFolder.parts[-2:])
+            local_probeFolder = all_VE_config.local_session_path / Path(*probeFolder.parts[-2:]) ### this is a local version of the top-evel folder of the spikeglx session
             local_probeFolder.mkdir(parents=True, exist_ok=True)
             recording = si.read_spikeglx(probeFolder, stream_id=all_VE_config.stream_id)  # for reading uncompressed from NAS
-            newRawFilePath = local_probeFolder / Path('phaseAndChannelCorrectedRaw.bin')
-            newRawMetaDataPath = local_probeFolder / Path('phaseAndChannelCorrectedRaw_meta.pkl') ### I should maybe make this a proper meta file... but changing the correct information to make that accurate seems very prone to error and complicated.
-            newRawFolderName = local_probeFolder / Path('phaseAndChannelCorrectedRaw')
-            if newRawFolderName.exists():
-                shutil.rmtree(newRawFolderName) ### removing an older method of saving raw...
-            if saveRawForPhyOrBombcell:
-
-
-                if (not (newRawFilePath.exists())) | overwriteRaw:
-                    rawForPhyOrBombcell = spikeglx_preprocessing(recording, doRemoveBadChannels=outerLoopConfigs.doRemoveBadChannels,
-                                                   skipStuffThatKSGUIDoes=True,
-                                                   local_probeFolder=local_probeFolder, badChannelList=all_VE_config.badChannelList,
-                                                   bin_s_sessionCat=outerLoopConfigs.bin_s_sessionCat,doSaturationReplace = False,silenceOrNoiseReplace=outerLoopConfigs.silenceOrNoiseReplace_sessionwise)
-                    job_kwargs = dict(n_jobs=-1, chunk_duration='1s', progress_bar=True)
-                    if newRawFilePath.exists(): ### either it doesn't exist or you want to overwrite
-                        os.remove(newRawFilePath)
-                    si.write_binary_recording(rawForPhyOrBombcell,newRawFilePath,**job_kwargs)
-                    minimalMetadata = {'sampling_frequency': rawForPhyOrBombcell.sampling_frequency,
-                             'dtype': rawForPhyOrBombcell.dtype,
-                                'num_channels': len(rawForPhyOrBombcell.channel_ids),
-                                'channel_ids': rawForPhyOrBombcell.channel_ids,
-                                'gain_to_uV': rawForPhyOrBombcell._properties["gain_to_uV"],
-                                'offset_to_uV': rawForPhyOrBombcell._properties["offset_to_uV"],
-                                'is_filtered': rawForPhyOrBombcell.is_filtered(),
-                                }
-                    with open(newRawMetaDataPath, 'wb') as f:
-                        pickle.dump(minimalMetadata, f)
-                    #rawForPhyOrBombcell = rawForPhyOrBombcell.save(folder = newRawFolderName, format='binary', **job_kwargs)
-            if usePresavedRaw:
-                if not ((newRawMetaDataPath.exists())): ### if you don't already have metadata, rerun the rawForPhyOrBombcell so you can get it... This is temporary, no one else should ever see this.
-                    rawForPhyOrBombcell = spikeglx_preprocessing(recording, doRemoveBadChannels=outerLoopConfigs.doRemoveBadChannels,
-                                                   skipStuffThatKSGUIDoes=True,
-                                                   local_probeFolder=local_probeFolder, badChannelList=all_VE_config.badChannelList,
-                                                   bin_s_sessionCat=outerLoopConfigs.bin_s_sessionCat,doSaturationReplace = False,silenceOrNoiseReplace=outerLoopConfigs.silenceOrNoiseReplace_sessionwise)
-                    minimalMetadata = {'sampling_frequency': rawForPhyOrBombcell.sampling_frequency,
-                             'dtype': rawForPhyOrBombcell.dtype,
-                                'num_channels': len(rawForPhyOrBombcell.channel_ids),
-                                'channel_ids': rawForPhyOrBombcell.channel_ids,
-                                'gain_to_uV': rawForPhyOrBombcell._properties["gain_to_uV"],
-                                'offset_to_uV': rawForPhyOrBombcell._properties["offset_to_uV"],
-                                'is_filtered': rawForPhyOrBombcell.is_filtered(),
-                                }
-                    with open(newRawMetaDataPath, 'wb') as f:
-                        pickle.dump(minimalMetadata, f)
-                with open(newRawMetaDataPath,'rb') as f:
-                    minimalMetadata= pickle.load(f)
-                recording = si.read_binary(newRawFilePath,minimalMetadata["sampling_frequency"],minimalMetadata["dtype"],minimalMetadata["num_channels"],channel_ids=minimalMetadata["channel_ids"],gain_to_uV=minimalMetadata["gain_to_uV"],offset_to_uV=minimalMetadata["offset_to_uV"],is_filtered=minimalMetadata["is_filtered"])
-                skipStuffThatMightBeInPresavedRaw=True
-            recording = spikeglx_preprocessing(recording, doRemoveBadChannels=outerLoopConfigs.doRemoveBadChannels,
-                                               skipStuffThatKSGUIDoes=outerLoopConfigs.skipStuffThatKSGUIDoes,
-                                               local_probeFolder=local_probeFolder, badChannelList=all_VE_config.badChannelList,
-                                               bin_s_sessionCat=outerLoopConfigs.bin_s_sessionCat,skipStuffThatMightBeInPresavedRaw=skipStuffThatMightBeInPresavedRaw,
-                                               doSaturationReplace=doSaturationReplace,
-                                               silenceOrNoiseReplace=outerLoopConfigs.silenceOrNoiseReplace_sessionwise)
+            rawFolderName = local_probeFolder / Path('catgt_CorrectedRaw')
+            if (not any((list(rawFolderName.glob('*.bin'))))) | overwriteRaw: # if you don't have a raw or you say you want to overwrite it, we make a new raw.
+                makeAndProcessRaw(NAS_session_path = all_VE_config.NAS_session_path,session_name=session_name,stream_id=all_VE_config.stream_id,local_session_path=all_VE_config.local_session_path,badChannelList=all_VE_config.badChannelList,catgt_location=outerLoopConfigs.catgt_location,rawFolderName=rawFolderName,overwriteRaw = overwriteRaw,createCompressed = createCompressed)
+            recording = si.read_spikeglx(rawFolderName, stream_id=all_VE_config.stream_id)
+            recording = spikeglx_preprocessing(recording,local_probeFolder=local_probeFolder,doSaturationReplace=doSaturationReplace,
+                                               silenceOrNoiseReplace=outerLoopConfigs.silenceOrNoiseReplace_sessionwise,floatDataTypeForDriftCorrection=floatIntoKilosort)
             ### do things related to the construction of a file which stores the recording information.
             multirec_info['name'].append(session_name)
             multirec_info['fs'].append(recording.get_sampling_frequency())
@@ -171,7 +122,7 @@ def main():
         output_folder_sorted = all_VE_config.output_folder / 'spikesorted' / all_VE_config.ferret / all_VE_config.sessionSetLabel / session_name
         phy_folder = output_folder_sorted / 'KiloSortSortingExtractor' / 'phy_folder'  # probably.
         phy_folder.mkdir(parents=True, exist_ok=True)
-        if False: #skipSessionsAlreadyDone: # should skip sessions already done but doesn't work. If the sorting stops partway through this folder will exist, but you would still want it to be rerun. Need to make a new thing later.
+        if True: #skipSessionsAlreadyDone: # should skip sessions already done but doesn't work. If the sorting stops partway through this folder will exist, but you would still want it to be rerun. Need to make a new thing later.
             if (output_folder_temp / Path("tempDir")).is_dir():
                 continue
         if saveMultirecInfoFile & runSessionLoop: # would like to seperate this from doing the preprocessing I think...
