@@ -34,6 +34,7 @@ def main():
     createCompressed = False # determines whether you create compressed raw. Good to do if you need the space, but all processing requires unpacking it.
     doSaturationReplace = False ### Need to make a catgt version of this...
     doSpikeSorting = True
+    JeffManuallySkipsAThingTemporarily = True
 
     #get sessions within map
     if not all_VE_config.SurveyOverride: ### if not a survey...
@@ -138,6 +139,9 @@ def main():
 
 
         if doSpikeSorting&((overwriteSpikesorting)|(not any(list(sorter_output_folder.glob('params.py'))))):
+            if JeffManuallySkipsAThingTemporarily:
+                if i == 1: ###
+                    continue
             ks.run_kilosort(settings, probe=None, probe_name=probe_name, filename=None,
                  data_dir=rawFolderName, file_object=None, results_dir=sorter_output_folder,
                  data_dtype=None, do_CAR=True, invert_sign=False, device=None,

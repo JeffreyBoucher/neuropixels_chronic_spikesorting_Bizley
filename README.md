@@ -38,12 +38,17 @@ After this, if you want to use a gpu, you need to do some stuff with torch:
 
 (doesn't work yet)
 
-pip uninstall torch (you for sure need to do this because you currently will have the cpu torch installed)
+pip uninstall torch (you for sure need to do this because you currently will have the cpu torch installed. Make sure
+you unintall it from your virtual environment, and not from anywhere else
 
-(the following doesn't work in most cases, you need to determine cuda and torch compatability for your specific gpu,
-which I will explain how to do as soon as I understand it. )
+Then, you want to install pytorch with cuda. The best way to do this will be to follow directions on the website. Reportedly,
+these days cuda is backward compatible, so you should just be able to use this link here for the correct comman line stuff:
+https://pytorch.org/get-started/locally/
+if not, you may want to look into previous versions, and to figure out which cuda version your gpu supports
+by using the command line function nvidia-smi. I think there is another slightly more accurate function, but have lost
+track of it...
 
-pip3 install torch --index-url https://download.pytorch.org/whl/cu118
+
 
 ## config.py
 
