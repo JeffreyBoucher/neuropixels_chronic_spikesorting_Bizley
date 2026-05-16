@@ -12,7 +12,7 @@ outputs the average drift per spatial bin per session. This is later used in the
 
 You only need the latter if you want to try and align across sessions. for spikesorting surveys, for example, there is no need. 
 
-After using each of these, you will be ready to use UnitMatch/Bombcell, which are in a seperate package because they 
+After using each of these, you will be ready to use UnitMatch/Bombcell, which are in a separate package because they 
 require a different virtual environment. 
 
 ## Installation
@@ -23,16 +23,27 @@ up using a search engine.
 
 After you get conda, you want to run:
 
-conda env create --name neuropixels_chronic_spikesorting_Bizley -f environmentThatWorks.yml
+conda env create --name neuropixels_chronic_spikesorting_Bizley -f environment.yml
+
+alternatively, use your IDE to create the environment with the yml file. I use pycharm, and pycharm has bugs with
+the command line which make using the gui more reliable. 
 
 Within that file, I have also said that, for whatever reason, you need to install kilosort seperately, and you should use:
 
 pip install kilosort --upgrade
 
-to do so. Notably, this will update to the most recent version of kilosort. At the time of this writing, the version 
-I have installed and working is 4.0.7. The more distant we get from that, the less likely it is to work unless effort is
-paid. Similarly, spikeinterface was 103.0 and may also break with distance. If versions ever give you problems, try doing ==0.103.0 
-the spikeinterface line in the yml file...  If this doesn't work, contact me so I can update the proper version.
+to do so, or use your IDE package manager
+
+After this, if you want to use a gpu, you need to do some stuff with torch:
+
+(doesn't work yet)
+
+pip uninstall torch (you for sure need to do this because you currently will have the cpu torch installed)
+
+(the following doesn't work in most cases, you need to determine cuda and torch compatability for your specific gpu,
+which I will explain how to do as soon as I understand it. )
+
+pip3 install torch --index-url https://download.pytorch.org/whl/cu118
 
 ## config.py
 
@@ -54,8 +65,4 @@ a special folder and give direction (right here) on where to copy-paste them. So
 from which the adjustment was made will be specified by the folder we put it in. 
 
 ## list of files to move and where (try without adjusting if you are using a more recent version of the relevant packages)
-
-    - .\neuropixels_chronic_spikesorting_Bizley\externalBugFixes\spike_interface\v_103.0\silence_periods.py
-
-        -from your external packages folder, replace \spikeinterface\preprocessing\silence_periods.py
-
+    (currently no need for any because spikeinterface fixed the silence_periods bug in the most recent version)

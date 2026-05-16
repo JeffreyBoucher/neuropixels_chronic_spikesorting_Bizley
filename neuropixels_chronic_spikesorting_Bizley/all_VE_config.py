@@ -147,10 +147,11 @@ if projectLabel == 'Jeffrey': # manages the highest-level selection of sessions 
 ###### folder names
 if projectLabel == 'Jeffrey':
     if computerUsed == 'JeffreyLabDesktop': # contains folder and file arguments, including higher-level ones like ferret name. Likely to be specific to my project
-        output_folder = Path('C:\\Jeffrey\\Projects\\SpeechAndNoise\\Spikesorting_Output')
+        output_folder = Path('C:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Output') ### this is the lower-level spot for spikesorted output, specified to ferret after the if statement.
         motionMapFolder = Path('C:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Inputs/SessionSetDriftmaps')
     elif computerUsed == 'ExternalDriveD':
         output_folder = Path('D:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Output')
+    sessionSetSortedFolder = output_folder / ferret / sessionSetLabel
     NAS_neural_data = Path('Z:/Data/Neuropixels/')
     if SurveyOverride:
         NAS_neural_data = NAS_neural_data / Path('Surveys')
@@ -162,7 +163,10 @@ if projectLabel == 'Jeffrey':
 
     behavior_path = Path("C:/Users/jeff/Dropbox/Data/" +ferret)
     figure_folder = Path('D:/Jeffrey/Projects/SpeechAndNoise/figures/')
-    FolderWithPickles = output_folder  / Path('tempDir/' +ferret + '/' + sessionSetLabel + '/FolderWithPickles')
+    FolderWithPickles = output_folder  / Path('tempDir/' +ferret + '/' + sessionSetLabel + '/FolderWithPickles') ### I will want to change this Once I undersd
+
+
+
 ###### very basic and probably unnecessary information, but which is good to have
 
 probeType = 'neuropixels'

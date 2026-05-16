@@ -19,9 +19,9 @@ if all_VE_config.projectLabel == 'Jeffrey':
 ###### PLOTTING PARAMETERS
 
 if all_VE_config.plottingArguments == 'JeffreyRecommended':
-    matplotlibGUItype = 'TkAgg' # my preferred plotting gui at the moment. One of the first i tried. It isn't that good though.
-
-    matplotlib.use(matplotlibGUItype)
+    # matplotlibGUItype = 'TkAgg' # my preferred plotting gui at the moment. One of the first i tried. It isn't that good though.
+    pass
+    # matplotlib.use(matplotlibGUItype)
 
 ###### SPIKESORTING PARAMETERS
 
@@ -151,7 +151,7 @@ week = 0
 last_session_previous_week = 0
 setsOfSessionsPerGrouping = []
 
-if all_VE_config.make_multirecording_info == 'JeffreyRecommended': # I try to save probe parameters in a more convenient location early on, because although the information is often available in the spikesorting output, it is annoying and inconsistent to actually extract it. ### That said, not fully certain I use this one and not one inside the main function.
+if all_VE_config.make_multirecording_info == 'skipthisandsee':#'JeffreyRecommended': # I try to save probe parameters in a more convenient location early on, because although the information is often available in the spikesorting output, it is annoying and inconsistent to actually extract it. ### That said, not fully certain I use this one and not one inside the main function.
 
     for sessionSetCount,currentSetOfSessions in enumerate(NAS_SetsOfConcatenatedSessions): # first, determine the sessions which require further analysis. ### this tells me that yes I do want to create dummy files locally even if I am NAS based
 

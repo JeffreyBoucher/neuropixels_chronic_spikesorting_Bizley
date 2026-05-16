@@ -103,6 +103,7 @@ def makeAndProcessRaw(NAS_session_path,session_name,stream_id,local_session_path
 
 def spikeglx_preprocessing(recording,local_probeFolder=None,doSaturationReplace=False,silenceOrNoiseReplace='noise',floatDataTypeForDriftCorrection=False):
 
+
     if doSaturationReplace: ### should consider trying to get this into the local raw via catgt instead of doing it here?
         windowsToSilenceArray = nullify_saturations(recording, local_probeFolder=local_probeFolder) # find saturations before any further processing. Only finds, doesn't correct.
 
