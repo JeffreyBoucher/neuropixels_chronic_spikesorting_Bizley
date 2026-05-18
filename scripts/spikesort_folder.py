@@ -18,7 +18,7 @@ import kilosort as ks
 
 
 from neuropixels_chronic_spikesorting_Bizley.helpers.helpers_spikesorting_scripts import sort_np_sessions, get_channelmap_names, getSessionsWithinMap
-from neuropixels_chronic_spikesorting_Bizley.spikesorting import spikesorting_pipeline, spikesorting_postprocessing, spikeglx_preprocessing, makeAndProcessRaw
+from neuropixels_chronic_spikesorting_Bizley.spikesorting import spikesorting_pipeline, spikesorting_postprocessing, nullify_saturations, spikeglx_preprocessing, makeAndProcessRaw
 from neuropixels_chronic_spikesorting_Bizley.helpers.npyx_metadata_fct import load_meta_file
 
 import neuropixels_chronic_spikesorting_Bizley.outerLoopConfigs as outerLoopConfigs
@@ -28,13 +28,12 @@ def main():
 
     ## these are a bunch of parameters you should set before running spikesorting which are hopefully named in a self-explanatory way.
     saveMultirecInfoFile = True ### whether to save metadata. You'll only want to turn it off if you are testing a thing and don't want to overwrite an old file or something...
-    overwriteRaw = False # determines if you recreate a raw that is already detected. Set to true if you want to remake it, false otherwise.
+    overwriteRaw = True # determines if you recreate a raw that is already detected. Set to true if you want to remake it, false otherwise.
     overwriteChanMap = True # determines whether you overwrite the channel map. In my opinion this should always be on.
     overwriteSpikesorting = False # determines whether you redo spikesortings that are already done. Overwrite when you try new things, don't sh
     createCompressed = False # determines whether you create compressed raw. Good to do if you need the space, but all processing requires unpacking it.
-    doSaturationReplace = False ### Need to make a catgt version of this...
+    doSaturationReplace = True ### Need to make a catgt version of this...
     doSpikeSorting = True
-    JeffManuallySkipsAThingTemporarily = True
 
     #get sessions within map
     if not all_VE_config.SurveyOverride: ### if not a survey...
@@ -67,6 +66,9 @@ def main():
         local_probeFolder = all_VE_config.local_session_path / Path(*NASprobeFolder.parts[-2:]) ### this is a local version of the top-evel folder of the spikeglx session
         local_probeFolder.mkdir(parents=True, exist_ok=True)
         rawFolderName = local_probeFolder / Path('catgt_CorrectedRaw')
+        if doSaturationReplace:
+            NASrecording = si.read_spikeglx(NASprobeFolder, stream_id=all_VE_config.stream_id)
+            windowsToSilenceArray = nullify_saturations(NASrecording, local_probeFolder=local_probeFolder)
         if (not any((list(rawFolderName.glob('*.bin'))))) | overwriteRaw: # if you don't have a raw or you say you want to overwrite it, we make a new raw.
             ### currently, I do not have a saturation removal function because my old one depended on SI. To be dealt with later.
 
@@ -137,14 +139,11 @@ def main():
             df_rec.to_csv(sorter_output_folder / 'multirec_info.csv',
                           index=False)  # this is the earliest phy folder around and may be a problem... This saves the multirec info... Also this stuff might be better saved in spikesortingInput...
 
-
+        ### note I am currently focusing cpu us
         if doSpikeSorting&((overwriteSpikesorting)|(not any(list(sorter_output_folder.glob('params.py'))))):
-            if JeffManuallySkipsAThingTemporarily:
-                if i == 1: ###
-                    continue
             ks.run_kilosort(settings, probe=None, probe_name=probe_name, filename=None,
                  data_dir=rawFolderName, file_object=None, results_dir=sorter_output_folder,
-                 data_dtype=None, do_CAR=True, invert_sign=False, device=None,
+                 data_dtype=None, do_CAR=True, invert_sign=False, device=torch.device('cpu'),
                  progress_bar=None, save_extra_vars=True, clear_cache=False,
                  save_preprocessed_copy=False, bad_channels=None, shank_idx=None,
                  verbose_console=True, verbose_log=True, torch_thread_lim=None)

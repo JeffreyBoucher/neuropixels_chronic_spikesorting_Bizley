@@ -30,7 +30,8 @@ if all_VE_config.generalSpikesortingArguments == 'JeffreyRecommended':
     si.set_global_job_kwargs(n_jobs=desired_n_jobs)
     doRemoveBadChannels = 1  # currently uses the manual list... I doubt you'll ever want to turn this off.
     skipStuffThatKSGUIDoes = 1  # this variable is fundamentally outdated at this point and will either be irrelevant if you see this, or deleted if you don't.
-
+    beginningAndEndToCutOff = [1, 1] ### saturation cutoff handling, for beginning and end
+    loadSatsFromFile = 1 # allow loading saturations from file vs always recalculating
 
 
 if all_VE_config.sessionwiseDriftCorrectionArguments == 'JeffreyRecommended': # contains si arguments. Likely to be nonspecific.

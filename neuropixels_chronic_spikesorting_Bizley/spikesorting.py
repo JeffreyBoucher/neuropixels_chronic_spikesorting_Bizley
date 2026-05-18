@@ -50,8 +50,8 @@ def makeAndProcessRaw(NAS_session_path,session_name,stream_id,local_session_path
     prb_string = '-prb=' + stream_id[-4] ### the imec number of the probe.
     g_string = '-g=' + session_name[-1] ### the number next to g. Almost always 0, unless an error happened.
     dest_string = '-dest=' + str(local_session_path)
-    CMR_string = '-gbldmx' ### Rebecca, you can use loccar_um to do a local car. Also, if you want to do nothing, make this ''.
-
+    CMR_string = '-gblcar' ### or gbldmx. Apparently car is better ### Rebecca, you can use loccar_um to do a local car. Also, if you want to do nothing, make this ''.
+    #gfix_string = '-gfix=' ### this is the catgt style saturation replacement. I probably won't use it because I prefer the one I wrote, to be honest.
 
     ## make -save string, which is a bit more involved... This is the thing that remove bad channels.
     js = '2'  ### 2 for AP, 3 for LF apparently. look up the documentation for -save in catgt.
@@ -101,21 +101,21 @@ def makeAndProcessRaw(NAS_session_path,session_name,stream_id,local_session_path
         pass ### haven't written the skip yet because I am not sure how I want to do it. By passing, you'll get an error if you don't overwrite. I imagine what I would want to do is check that the file has actually been created properly before skipping (just checking if the folder exists wouldn't do that)
     os.rename(catgt_output_folder_path,rawFolderName)
 
-def spikeglx_preprocessing(recording,local_probeFolder=None,doSaturationReplace=False,silenceOrNoiseReplace='noise',floatDataTypeForDriftCorrection=False):
+def spikeglx_preprocessing(recording,local_probeFolder=None,doSaturationReplace=False,silenceOrNoiseReplace='noise',floatDataTypeForDriftCorrection=False): ### not quite defunct because I use it for the sessionwise drift correction.
 
 
-    if doSaturationReplace: ### should consider trying to get this into the local raw via catgt instead of doing it here?
-        windowsToSilenceArray = nullify_saturations(recording, local_probeFolder=local_probeFolder) # find saturations before any further processing. Only finds, doesn't correct.
+    # if doSaturationReplace: ### should consider trying to get this into the local raw via catgt instead of doing it here?
+    #     windowsToSilenceArray = nullify_saturations(recording, local_probeFolder=local_probeFolder) # find saturations before any further processing. Only finds, doesn't correct.
 
     if floatDataTypeForDriftCorrection:
         if not (recording.dtype == 'float32'):
             recording = recording.astype(dtype="float32")
-    if doSaturationReplace:
-        if windowsToSilenceArray.any():  # code breaks when no saturation
-            if global_configs.useBugFixedSilencePeriods:
-                recording = silence_periods_file.silence_periods(recording, windowsToSilenceArray, mode=silenceOrNoiseReplace)
-            else:
-                recording = si.silence_periods(recording, windowsToSilenceArray, mode=silenceOrNoiseReplace) # Doing this before whitening might cause issues... I need to understand how whitening works better.
+    # if doSaturationReplace:
+    #     if windowsToSilenceArray.any():  # code breaks when no saturation
+    #         if global_configs.useBugFixedSilencePeriods:
+    #             recording = silence_periods_file.silence_periods(recording, windowsToSilenceArray, mode=silenceOrNoiseReplace)
+    #         else:
+    #             recording = si.silence_periods(recording, windowsToSilenceArray, mode=silenceOrNoiseReplace) # Doing this before whitening might cause issues... I need to understand how whitening works better.
             # recording = recording.astype('int16') ### reportedly converting back in this way is dangerous, and I should look into it. I need to do it for harddrive space, but otherwise I shouldn't bother.
         # spikeglx_visualize(recording)
     return recording
@@ -207,7 +207,7 @@ def spikeglx_preprocessing_historical(recording,doRemoveBadChannels =1,skipStuff
         # spikeglx_visualize(recording)
     return recording
 
-def nullify_saturations(recording,surrondingToAlsoNullify=100,local_probeFolder=None):
+def nullify_saturations(recording,surrondingToAlsoNullify=100,local_probeFolder=None,beginningAndEndToCutOff=[0,0],loadSatsFromFile):
     # The idea behind this function is to:
     #     - Detect saturated periods like si.blank_saturation
     #           (in fact, this program does this channel by channel I think. I will actually want to apply my threshold on the
@@ -230,8 +230,7 @@ def nullify_saturations(recording,surrondingToAlsoNullify=100,local_probeFolder=
     #     -recording (the si recording)
     #     -surroundingToAlsoNullify (in ms. So input 10 here and 10 ms on each end of each null period will also be null.
     #                The intention here is to deal with the up and down ramps involved in saturation conservatively.
-    loadSatsFromFile = 1
-    alsoCutOffBeginningAndEnd = 1
+
 
     local_probeFolder.mkdir(parents=True, exist_ok=True)
     fileNameSat = local_probeFolder / Path("saturatedZones.csv")
@@ -250,11 +249,12 @@ def nullify_saturations(recording,surrondingToAlsoNullify=100,local_probeFolder=
         for chunkSet in windowsToSilence: # yes it's silly to do this afterward instead of during, but it's really not a big deal. Default function outputs list.
             windowsToSilenceArray = np.concatenate((windowsToSilenceArray,chunkSet))
         np.savetxt(fileNameSat, windowsToSilenceArray)
-    if alsoCutOffBeginningAndEnd:
-        secondsToCut = 2
-        windowsToSilenceArray = np.concatenate(([[0,int(recording.sampling_frequency*secondsToCut)]],windowsToSilenceArray))
-        windowsToSilenceArray = np.concatenate((windowsToSilenceArray,  [[(recording.get_num_frames()-int(recording.sampling_frequency*secondsToCut)),recording.get_num_frames()]]))
-    if True: # section for dealing with specific sessions.
+    if any(beginningAndEndToCutOff):
+        secondsToCutBeginning = beginningAndEndToCutOff[0]
+        secondsToCutEnd = beginningAndEndToCutOff[1]
+        windowsToSilenceArray = np.concatenate(([[0,int(recording.sampling_frequency*secondsToCutBeginning)]],windowsToSilenceArray))
+        windowsToSilenceArray = np.concatenate((windowsToSilenceArray,  [[(recording.get_num_frames()-int(recording.sampling_frequency*secondsToCutEnd)),recording.get_num_frames()]]))
+    if True: # section for dealing with specific sessions. ### the fact that this exists means that I should maybe generalize this code as defining all bad regions instead of just nullifying saturations.
         topFolderString = local_probeFolder.parts[-1]
         if topFolderString[0:19] == "23052024_AM_Challah":
             # ferret held in hand 45 seconds from end of recording. Should affect both probes ### but it seems like maybe it didn't work? ### Turns out the reason it didn't work is because the recordings are different lengths. Probably what was done was the PFC was unplugged, than the ACx. Rather than basing things 45 seconds from the end, we should do 665 from the beginning
