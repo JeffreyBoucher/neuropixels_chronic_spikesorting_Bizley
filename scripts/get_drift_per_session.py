@@ -24,10 +24,33 @@ from neuropixels_chronic_spikesorting_Bizley.spikesorting import spikesorting_pi
 from neuropixels_chronic_spikesorting_Bizley.helpers.npyx_metadata_fct import load_meta_file
 
 def main():
-    ## should put this in outerLoopConfigs
-    doSaturationReplace = True
+    setsOfSessionsPerGrouping = []
+    for sessionSetCount, currentSetOfSessions in enumerate(outerLoopConfigs.NAS_SetsOfConcatenatedSessions):  # first, determine the sessions which require further analysis. ### this tells me that yes I do want to create dummy files locally even if I am NAS based
+            sessionsWithinMap = []
+            for i, session in enumerate(currentSetOfSessions):
+                session_name = session.name
+                if (all_VE_config.frequencyOfConcatenation == 'weekly_heuristic') & (not i):
+                    sessionSetName = 'weekOf' + session_name[4:8] + session_name[2:4] + session_name[0:2]  # name after first day of week. Also, swap to year month day so that things are alphabetical
+                elif (not (all_VE_config.frequencyOfConcatenation == 'weekly_heuristic')) & (not i):
+                    sessionSetName = session_name
+                print(f'Processing {sessionSetName}')
+                dp = all_VE_config.NAS_session_path / session_name
+                chan_dict = get_channelmap_names(dp)
+                if (session_name + "_" + all_VE_config.stream_id[:-3]) in chan_dict:
+                    if any(v == all_VE_config.channel_map_to_use for v in chan_dict.values()):
+                        sessionsWithinMap.append(session)
+                else:
+                    print('a bug you should solve')
+                    pass
 
-    for sessionSetCount,currentSetOfSessions in enumerate(outerLoopConfigs.setsOfSessionsPerGrouping): #with weekly heuristic, each current set of session is a list of path objects
+            if any(sessionsWithinMap):
+                setsOfSessionsPerGrouping.append(sessionsWithinMap)
+            elif all_VE_config.SurveyOverride:
+                setsOfSessionsPerGrouping.append(
+                    currentSetOfSessions)  ### if Survey, map will constantly change and everything should be well-specified, so we don't need to consider map in the same way...
+
+
+    for sessionSetCount,currentSetOfSessions in enumerate(setsOfSessionsPerGrouping): #with weekly heuristic, each current set of session is a list of path objects
         if not all_VE_config.sessionsToDo == 'all':
             if not (sessionSetCount in all_VE_config.sessionsToDo):
                 continue
@@ -66,7 +89,7 @@ def main():
                 # recording = si.read_cbin_ibl(probeFolder)  # for compressed
                 local_probeFolder = all_VE_config.local_session_path / Path(*probeFolder.parts[-2:])
                 recording = si.read_spikeglx(probeFolder, stream_id=all_VE_config.stream_id) # for uncompressed
-                recording = spikeglx_preprocessing(recording, doRemoveBadChannels=outerLoopConfigs.doRemoveBadChannels,skipStuffThatKSGUIDoes=outerLoopConfigs.skipStuffThatKSGUIDoes,local_probeFolder=local_probeFolder,badChannelList=all_VE_config.badChannelList,bin_s_sessionCat=outerLoopConfigs.bin_s_sessionCat,doSaturationReplace=doSaturationReplace,silenceOrNoiseReplace=outerLoopConfigs.silenceOrNoiseReplace_sessionwise,floatDataTypeForDriftCorrection=True)
+                recording = spikeglx_preprocessing(recording, doRemoveBadChannels=outerLoopConfigs.doRemoveBadChannels,skipStuffThatKSGUIDoes=outerLoopConfigs.skipStuffThatKSGUIDoes,local_probeFolder=local_probeFolder,badChannelList=all_VE_config.badChannelList,bin_s_sessionCat=outerLoopConfigs.bin_s_sessionCat,doSaturationReplace=outerLoopConfigs.doSaturationReplace,silenceOrNoiseReplace=outerLoopConfigs.silenceOrNoiseReplace_sessionwise,floatDataTypeForDriftCorrection=True)
                 ### do things related to the construction of a file which stores the recording information.
                 outerLoopConfigs.multirec_info['name'].append(session_name)
                 outerLoopConfigs.multirec_info['fs'].append(recording.get_sampling_frequency())

@@ -27,10 +27,10 @@ if projectLabel == 'Jeffrey': ### here will be ferret specific arguments
     # recordingZone = 'ACx_Boule_top_tipref_March2025'
     #recordingZone = 'PFC_Boule_Borders_Top_GroundrefIThink'
     #recordingZone = 'PFC_Boule_Borders_Top'
-    # recordingZone = 'PFC_shank0_Challah'
+    recordingZone = 'PFC_shank0_Challah'
     #recordingZone = 'PFC_shank3_Challah'
     #recordingZone = "ACx_Challah_top_groundref_June2024"
-    recordingZone = "ACx_Challah_top_groundref_May2024"
+    # recordingZone = "ACx_Challah_top_groundref_May2024"
     # recordingZone = "Challah_Survey" ### intended to be an adaptable set for if I want to spikesort a specific survey
     sessionsToDo = 'all'
     frequencyOfConcatenation = 'do_everything' #'weekly_heuristic' or 'do_everything'. do_everything is contained per probemap.

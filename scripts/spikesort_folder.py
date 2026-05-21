@@ -18,7 +18,7 @@ import kilosort as ks
 
 
 from neuropixels_chronic_spikesorting_Bizley.helpers.helpers_spikesorting_scripts import sort_np_sessions, get_channelmap_names, getSessionsWithinMap
-from neuropixels_chronic_spikesorting_Bizley.spikesorting import spikesorting_pipeline, spikesorting_postprocessing, nullify_saturations, spikeglx_preprocessing, makeAndProcessRaw
+from neuropixels_chronic_spikesorting_Bizley.spikesorting import spikesorting_pipeline, spikesorting_postprocessing, applyOverStrike, nullify_saturations, spikeglx_preprocessing, makeAndProcessRaw
 from neuropixels_chronic_spikesorting_Bizley.helpers.npyx_metadata_fct import load_meta_file
 
 import neuropixels_chronic_spikesorting_Bizley.outerLoopConfigs as outerLoopConfigs
@@ -32,7 +32,6 @@ def main():
     overwriteChanMap = True # determines whether you overwrite the channel map. In my opinion this should always be on.
     overwriteSpikesorting = False # determines whether you redo spikesortings that are already done. Overwrite when you try new things, don't sh
     createCompressed = False # determines whether you create compressed raw. Good to do if you need the space, but all processing requires unpacking it.
-    doSaturationReplace = True ### Need to make a catgt version of this...
     doSpikeSorting = True
 
     #get sessions within map
@@ -44,7 +43,6 @@ def main():
     # session_name = '021122_trifle_pm3_g0'
     #for session in session_path.glob('*'):
     for i, session in enumerate(NAS_SessionsWithinMap):
-
         multirec_info = {'name': [],
                          'start_time': [],
                          # 'stop_time': [],
@@ -66,13 +64,15 @@ def main():
         local_probeFolder = all_VE_config.local_session_path / Path(*NASprobeFolder.parts[-2:]) ### this is a local version of the top-evel folder of the spikeglx session
         local_probeFolder.mkdir(parents=True, exist_ok=True)
         rawFolderName = local_probeFolder / Path('catgt_CorrectedRaw')
-        if doSaturationReplace:
+        if outerLoopConfigs.doSaturationReplace:
             NASrecording = si.read_spikeglx(NASprobeFolder, stream_id=all_VE_config.stream_id)
-            windowsToSilenceArray = nullify_saturations(NASrecording, local_probeFolder=local_probeFolder)
+            windowsToSilenceArray = nullify_saturations(NASrecording, local_probeFolder=local_probeFolder) ### a numpy array with sample ranges that we want to exclude. Will be input into OverStrike later.
         if (not any((list(rawFolderName.glob('*.bin'))))) | overwriteRaw: # if you don't have a raw or you say you want to overwrite it, we make a new raw.
             ### currently, I do not have a saturation removal function because my old one depended on SI. To be dealt with later.
-
             makeAndProcessRaw(NAS_session_path = all_VE_config.NAS_session_path,session_name=session_name,stream_id=all_VE_config.stream_id,local_session_path=all_VE_config.local_session_path,badChannelList=all_VE_config.badChannelList,catgt_location=outerLoopConfigs.catgt_location,rawFolderName=rawFolderName,overwriteRaw = overwriteRaw,createCompressed = createCompressed)
+            if outerLoopConfigs.doSaturationReplace: # requires saying you will overwrite. I hope that is natural.
+                applyOverStrike(list(rawFolderName.glob('*.bin'))[0],outerLoopConfigs.OverStrike_location,windowsToSilenceArray)
+
         recording = si.read_spikeglx(rawFolderName, stream_id=all_VE_config.stream_id) ### use si just to read the meta file.
 
 
@@ -143,7 +143,7 @@ def main():
         if doSpikeSorting&((overwriteSpikesorting)|(not any(list(sorter_output_folder.glob('params.py'))))):
             ks.run_kilosort(settings, probe=None, probe_name=probe_name, filename=None,
                  data_dir=rawFolderName, file_object=None, results_dir=sorter_output_folder,
-                 data_dtype=None, do_CAR=True, invert_sign=False, device=torch.device('cpu'),
+                 data_dtype=None, do_CAR=True, invert_sign=False, device=None,
                  progress_bar=None, save_extra_vars=True, clear_cache=False,
                  save_preprocessed_copy=False, bad_channels=None, shank_idx=None,
                  verbose_console=True, verbose_log=True, torch_thread_lim=None)

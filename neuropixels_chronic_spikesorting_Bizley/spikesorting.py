@@ -51,6 +51,7 @@ def makeAndProcessRaw(NAS_session_path,session_name,stream_id,local_session_path
     g_string = '-g=' + session_name[-1] ### the number next to g. Almost always 0, unless an error happened.
     dest_string = '-dest=' + str(local_session_path)
     CMR_string = '-gblcar' ### or gbldmx. Apparently car is better ### Rebecca, you can use loccar_um to do a local car. Also, if you want to do nothing, make this ''.
+    filter_string = '-apfilter="butter,12,300,6000"' #; order-N band-pass ### the butterworth filter is zero-phase. I will be primarily doing it for the high pass filter. Low pass filter will also help
     #gfix_string = '-gfix=' ### this is the catgt style saturation replacement. I probably won't use it because I prefer the one I wrote, to be honest.
 
     ## make -save string, which is a bit more involved... This is the thing that remove bad channels.
@@ -61,7 +62,7 @@ def makeAndProcessRaw(NAS_session_path,session_name,stream_id,local_session_path
     save_string = '-save=' + js + ',' + prb_string[-1] + ',' + out_streamid_num + ',' + channelsToKeepString ### the "-save" argument wants you to put js, in-imec-num, out-imec-num first before all the channels you want to save.
     chnexcl_string = '-chnexcl={'+stream_id[-4]+';'+str(badChannelList)[1:-1].replace(" ", "")+'} ' ### we also need to say we are excluding channels, because they do seperate things. save_string is about which channels you save, but this one is about which channels are exlcuded from thing like the CAR.
 
-    catgt_command = 'runit.bat ' + dir_string + ' ' + run_string + ' ' + g_string + ' ' + '-t=0 -ap' + ' ' + prb_string + ' ' + dest_string + ' -prb_fld ' + chnexcl_string + save_string + ' ' + CMR_string
+    catgt_command = 'runit.bat ' + dir_string + ' ' + run_string + ' ' + g_string + ' ' + '-t=0 -ap' + ' ' + prb_string + ' ' + dest_string + ' -prb_fld ' + chnexcl_string + save_string + ' ' + CMR_string + ' ' + filter_string
 
     catgt_output_folder_path = local_session_path / Path('catgt_' + session_name)
 
@@ -207,7 +208,7 @@ def spikeglx_preprocessing_historical(recording,doRemoveBadChannels =1,skipStuff
         # spikeglx_visualize(recording)
     return recording
 
-def nullify_saturations(recording,surrondingToAlsoNullify=100,local_probeFolder=None,beginningAndEndToCutOff=[0,0],loadSatsFromFile):
+def nullify_saturations(recording,surrondingToAlsoNullify=100,local_probeFolder=None,beginningAndEndToCutOff=[0,0],loadSatsFromFile=True):
     # The idea behind this function is to:
     #     - Detect saturated periods like si.blank_saturation
     #           (in fact, this program does this channel by channel I think. I will actually want to apply my threshold on the
@@ -258,7 +259,7 @@ def nullify_saturations(recording,surrondingToAlsoNullify=100,local_probeFolder=
         topFolderString = local_probeFolder.parts[-1]
         if topFolderString[0:19] == "23052024_AM_Challah":
             # ferret held in hand 45 seconds from end of recording. Should affect both probes ### but it seems like maybe it didn't work? ### Turns out the reason it didn't work is because the recordings are different lengths. Probably what was done was the PFC was unplugged, than the ACx. Rather than basing things 45 seconds from the end, we should do 665 from the beginning
-            if alsoCutOffBeginningAndEnd:
+            if any(beginningAndEndToCutOff):
                windowsToSilenceArray = np.concatenate((windowsToSilenceArray[0:-1,:], [[(int(recording.sampling_frequency * 665)),recording.get_num_frames()]]))
 
             else:
@@ -272,6 +273,16 @@ def nullify_saturations(recording,surrondingToAlsoNullify=100,local_probeFolder=
                      int(30000*endTime)],]))
 
     return windowsToSilenceArray
+def applyOverStrike(rawFileName,OverStrike_location,windowsToSilenceArray):
+
+    file_string = '-file=' + '"' + str(rawFileName) + '"'
+    linefill_string = '-linefill' ### make a blank string if you don't want.
+    for i, currentWindow in enumerate(windowsToSilenceArray):
+        samps_string = '-samp="' + str(int(currentWindow[0])) + "," + str(int(currentWindow[1])) + '"'
+        overStrikeCommand = 'OverStrike ' + file_string + ' ' + samps_string + ' ' + linefill_string
+        run_in_path = str(OverStrike_location) + '\\' + overStrikeCommand
+        subprocess.Popen(run_in_path).wait()
+        pass
 
 def nullify_saturations_init_func(recording,surrondingToAlsoNullify):
     # It seems like the only place you can put any information about the recording or w/e is here.

@@ -15,7 +15,7 @@ import neuropixels_chronic_spikesorting_Bizley.all_VE_config as all_VE_config # 
 if all_VE_config.projectLabel == 'Jeffrey':
     if all_VE_config.computerUsed == 'JeffreyLabDesktop':
         catgt_location = Path('C:/Users/jeff/PycharmProjects/neuropixels_chronic_spikesorting_Bizley/CatGT-win') # should be local to the VE, but absolute paths are nice.
-
+        OverStrike_location = Path('C:/Users/jeff/PycharmProjects/neuropixels_chronic_spikesorting_Bizley/OverStrike-win')
 ###### PLOTTING PARAMETERS
 
 if all_VE_config.plottingArguments == 'JeffreyRecommended':
@@ -32,6 +32,7 @@ if all_VE_config.generalSpikesortingArguments == 'JeffreyRecommended':
     skipStuffThatKSGUIDoes = 1  # this variable is fundamentally outdated at this point and will either be irrelevant if you see this, or deleted if you don't.
     beginningAndEndToCutOff = [1, 1] ### saturation cutoff handling, for beginning and end
     loadSatsFromFile = 1 # allow loading saturations from file vs always recalculating
+    doSaturationReplace = True
 
 
 if all_VE_config.sessionwiseDriftCorrectionArguments == 'JeffreyRecommended': # contains si arguments. Likely to be nonspecific.
@@ -150,41 +151,3 @@ record_space_bins_weeks = []#recording drift/motion for UnitMatch later
 week_session_correspondance = []
 week = 0
 last_session_previous_week = 0
-setsOfSessionsPerGrouping = []
-
-if all_VE_config.make_multirecording_info == 'skipthisandsee':#'JeffreyRecommended': # I try to save probe parameters in a more convenient location early on, because although the information is often available in the spikesorting output, it is annoying and inconsistent to actually extract it. ### That said, not fully certain I use this one and not one inside the main function.
-
-    for sessionSetCount,currentSetOfSessions in enumerate(NAS_SetsOfConcatenatedSessions): # first, determine the sessions which require further analysis. ### this tells me that yes I do want to create dummy files locally even if I am NAS based
-
-        ### Make a file that keeps track of the recording info
-        multirec_info = {'name': [],
-                         'start_time': [],
-                         # 'stop_time': [],
-                         'duration': [],
-                         'fs': [],
-                         'n_samples': [],
-                         'multirec_start_sample': [],
-                         'multirec_stop_sample': [],
-                         'fullpath_as_string': []}
-        sessionLoopBreakFlag = False
-        sessionsWithinMap = []
-        for i,session in enumerate(currentSetOfSessions):
-            session_name = session.name
-            if (all_VE_config.frequencyOfConcatenation == 'weekly_heuristic') & (not i):
-                sessionSetName = 'weekOf' + session_name[4:8] + session_name[2:4] + session_name[0:2]  # name after first day of week. Also, swap to year month day so that things are alphabetical
-            elif (not (all_VE_config.frequencyOfConcatenation == 'weekly_heuristic')) & (not i):
-                sessionSetName = session_name
-            print(f'Processing {sessionSetName}')
-            dp = all_VE_config.NAS_session_path / session_name
-            chan_dict = get_channelmap_names(dp)
-            if (session_name + "_" + all_VE_config.stream_id[:-3]) in chan_dict:
-                if any(v == all_VE_config.channel_map_to_use for v in chan_dict.values()):
-                    sessionsWithinMap.append(session)
-            else:
-                print('a bug you should solve')
-                pass
-
-        if any(sessionsWithinMap):
-            setsOfSessionsPerGrouping.append(sessionsWithinMap)
-        elif all_VE_config.SurveyOverride:
-            setsOfSessionsPerGrouping.append(currentSetOfSessions) ### if Survey, map will constantly change and everything should be well-specified, so we don't need to consider map in the same way...
