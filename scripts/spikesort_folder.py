@@ -30,9 +30,11 @@ def main():
     saveMultirecInfoFile = True ### whether to save metadata. You'll only want to turn it off if you are testing a thing and don't want to overwrite an old file or something...
     overwriteRaw = True # determines if you recreate a raw that is already detected. Set to true if you want to remake it, false otherwise.
     overwriteChanMap = True # determines whether you overwrite the channel map. In my opinion this should always be on.
-    overwriteSpikesorting = False # determines whether you redo spikesortings that are already done. Overwrite when you try new things, don't sh
+    overwriteSpikesorting = True # determines whether you redo spikesortings that are already done. Overwrite when you try new things, don't sh
     createCompressed = False # determines whether you create compressed raw. Good to do if you need the space, but all processing requires unpacking it.
     doSpikeSorting = True
+    copyAuxData = True
+    overwriteAuxData = False
 
     #get sessions within map
     if not all_VE_config.SurveyOverride: ### if not a survey...
@@ -56,13 +58,21 @@ def main():
         session_name = session.name
 
         print(f'Processing {session_name}')
-        working_dir = all_VE_config.output_folder / 'tempDir' / all_VE_config.ferret / session_name
         NAS_currentDataPath = all_VE_config.NAS_session_path / session_name
 
         NASprobeFolder = list(NAS_currentDataPath.glob('*' + all_VE_config.stream_id[:-3])) ### instead of depending on streamid I should read the meta files in both folders and decide based on probemap.
         NASprobeFolder = NASprobeFolder[0]  # name of probe folder
         local_probeFolder = all_VE_config.local_session_path / Path(*NASprobeFolder.parts[-2:]) ### this is a local version of the top-evel folder of the spikeglx session
         local_probeFolder.mkdir(parents=True, exist_ok=True)
+        if copyAuxData:
+            if (not any(list(local_probeFolder.parent.glob('*.bin')))) | overwriteAuxData:
+                probable_ni_file = list(NASprobeFolder.parent.glob('*.bin'))[0] ### onebox might have to do this differently
+                probable_ni_meta_file = list(NASprobeFolder.parent.glob('*.meta'))[0] ### onebox might have to do this differently
+                target_ni_file = local_probeFolder.parent / probable_ni_file.name ### the place where we are sending it
+                target_ni_meta_file = local_probeFolder.parent / probable_ni_meta_file.name
+                shutil.copy(probable_ni_file,target_ni_file)
+                shutil.copy(probable_ni_meta_file,target_ni_meta_file)
+            pass
         rawFolderName = local_probeFolder / Path('catgt_CorrectedRaw')
         if outerLoopConfigs.doSaturationReplace:
             NASrecording = si.read_spikeglx(NASprobeFolder, stream_id=all_VE_config.stream_id)
@@ -140,7 +150,7 @@ def main():
                           index=False)  # this is the earliest phy folder around and may be a problem... This saves the multirec info... Also this stuff might be better saved in spikesortingInput...
 
         ### note I am currently focusing cpu us
-        if doSpikeSorting&((overwriteSpikesorting)|(not any(list(sorter_output_folder.glob('params.py'))))):
+        if doSpikeSorting&((overwriteSpikesorting)|(not any(list(sorter_output_folder.glob('params.py'))))): ### overwrite will currently not remove bombcell results and such from the folder. It should.
             ks.run_kilosort(settings, probe=None, probe_name=probe_name, filename=None,
                  data_dir=rawFolderName, file_object=None, results_dir=sorter_output_folder,
                  data_dtype=None, do_CAR=True, invert_sign=False, device=None,
