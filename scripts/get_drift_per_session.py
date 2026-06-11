@@ -24,30 +24,33 @@ from neuropixels_chronic_spikesorting_Bizley.spikesorting import spikesorting_pi
 from neuropixels_chronic_spikesorting_Bizley.helpers.npyx_metadata_fct import load_meta_file
 
 def main():
+    if True: ### the following arguments are for debug
+        pass
+        useLocalNotNAS = True ### I remember reading that results of drift correction are better for rawer data, but don't totally believe it. So I want to hedge. The thing they said was really bad for it was the whitening anyway.
+    actuallyRunDriftCorrection = True ### If you set to false, plot instead
     setsOfSessionsPerGrouping = []
     for sessionSetCount, currentSetOfSessions in enumerate(outerLoopConfigs.NAS_SetsOfConcatenatedSessions):  # first, determine the sessions which require further analysis. ### this tells me that yes I do want to create dummy files locally even if I am NAS based
-            sessionsWithinMap = []
-            for i, session in enumerate(currentSetOfSessions):
-                session_name = session.name
-                if (all_VE_config.frequencyOfConcatenation == 'weekly_heuristic') & (not i):
-                    sessionSetName = 'weekOf' + session_name[4:8] + session_name[2:4] + session_name[0:2]  # name after first day of week. Also, swap to year month day so that things are alphabetical
-                elif (not (all_VE_config.frequencyOfConcatenation == 'weekly_heuristic')) & (not i):
-                    sessionSetName = session_name
-                print(f'Processing {sessionSetName}')
-                dp = all_VE_config.NAS_session_path / session_name
-                chan_dict = get_channelmap_names(dp)
-                if (session_name + "_" + all_VE_config.stream_id[:-3]) in chan_dict:
-                    if any(v == all_VE_config.channel_map_to_use for v in chan_dict.values()):
-                        sessionsWithinMap.append(session)
-                else:
-                    print('a bug you should solve')
-                    pass
+        sessionsWithinMap = []
+        for i, session in enumerate(currentSetOfSessions):
+            session_name = session.name
+            if (all_VE_config.frequencyOfConcatenation == 'weekly_heuristic') & (not i):
+                sessionSetName = 'weekOf' + session_name[4:8] + session_name[2:4] + session_name[0:2]  # name after first day of week. Also, swap to year month day so that things are alphabetical
+            elif (not (all_VE_config.frequencyOfConcatenation == 'weekly_heuristic')) & (not i):
+                sessionSetName = session_name
+            print(f'Processing {sessionSetName}')
+            dp = all_VE_config.NAS_session_path / session_name
+            chan_dict = get_channelmap_names(dp)
+            if (session_name + "_" + all_VE_config.stream_id[:-3]) in chan_dict:
+                if any(v == all_VE_config.channel_map_to_use for v in chan_dict.values()):
+                    sessionsWithinMap.append(session)
+            else:
+                print('a bug you should solve')
+                pass
 
-            if any(sessionsWithinMap):
-                setsOfSessionsPerGrouping.append(sessionsWithinMap)
-            elif all_VE_config.SurveyOverride:
-                setsOfSessionsPerGrouping.append(
-                    currentSetOfSessions)  ### if Survey, map will constantly change and everything should be well-specified, so we don't need to consider map in the same way...
+        if any(sessionsWithinMap):
+            setsOfSessionsPerGrouping.append(sessionsWithinMap)
+        elif all_VE_config.SurveyOverride:
+            setsOfSessionsPerGrouping.append(currentSetOfSessions)  ### if Survey, map will constantly change and everything should be well-specified, so we don't need to consider map in the same way...
 
 
     for sessionSetCount,currentSetOfSessions in enumerate(setsOfSessionsPerGrouping): #with weekly heuristic, each current set of session is a list of path objects
@@ -74,45 +77,26 @@ def main():
             elif (not (all_VE_config.frequencyOfConcatenation == 'weekly_heuristic')) & (not i):
                 sessionSetName = session_name
             print(f'Processing {sessionSetName}')
-            working_dir = all_VE_config.output_folder / 'tempDir' / all_VE_config.ferret / session_name
             NAS_currentDataPath = all_VE_config.NAS_session_path / session_name
-            chan_dict = get_channelmap_names(NAS_currentDataPath)  # almost works but something about the format is different. no "imRoFile" perameter. There is something called an "imRoTable" which is probably also what I want. But let's deal with this later, when we know we need it. Because, honestly, we want something more sophisticated than this eventually.
+            chan_dict = get_channelmap_names(NAS_currentDataPath)
             chan_map_name = chan_dict[session_name + "_" + all_VE_config.stream_id[:-3]]
             if (not (chan_map_name == all_VE_config.channel_map_to_use)):
                 print('But not really, because of the probe map')
                 print('this currently handles weeks where I switch maps very badly!')
                 sessionLoopBreakFlag = True
                 break
-            probeFolder = list(NAS_currentDataPath.glob('*' + all_VE_config.stream_id[:-3]))
+            probeFolder = list(NAS_currentDataPath.glob('*' + all_VE_config.stream_id[:-3])) ### using imec# to refer to the probe is foolish and should be avoided. I have code that goes through each meta file and chooses that way. Later I should put that here.
             probeFolder = probeFolder[0]
-            if outerLoopConfigs.doPreprocessing:
+            if actuallyRunDriftCorrection:
                 # recording = si.read_cbin_ibl(probeFolder)  # for compressed
-                local_probeFolder = all_VE_config.local_session_path / Path(*probeFolder.parts[-2:])
-                recording = si.read_spikeglx(probeFolder, stream_id=all_VE_config.stream_id) # for uncompressed
-                recording = spikeglx_preprocessing(recording, doRemoveBadChannels=outerLoopConfigs.doRemoveBadChannels,skipStuffThatKSGUIDoes=outerLoopConfigs.skipStuffThatKSGUIDoes,local_probeFolder=local_probeFolder,badChannelList=all_VE_config.badChannelList,bin_s_sessionCat=outerLoopConfigs.bin_s_sessionCat,doSaturationReplace=outerLoopConfigs.doSaturationReplace,silenceOrNoiseReplace=outerLoopConfigs.silenceOrNoiseReplace_sessionwise,floatDataTypeForDriftCorrection=True)
-                ### do things related to the construction of a file which stores the recording information.
-                outerLoopConfigs.multirec_info['name'].append(session_name)
-                outerLoopConfigs.multirec_info['fs'].append(recording.get_sampling_frequency())
-                outerLoopConfigs.multirec_info['n_samples'].append(recording.get_num_samples())
-                outerLoopConfigs.multirec_info['duration'].append(recording.get_total_duration())
-
-                meta = load_meta_file(probeFolder / (session_name + '_t0.' + all_VE_config.stream_id + '.meta'))
-                outerLoopConfigs.multirec_info['start_time'].append(meta['fileCreateTime'])
-
-                if i == 0:
-                    outerLoopConfigs.multirec_info['multirec_start_sample'].append(0)
+                if not useLocalNotNAS:
+                    recording = si.read_spikeglx(probeFolder, stream_id=all_VE_config.stream_id) # for uncompressed
+                    recording = spikeglx_preprocessing(recording, doRemoveBadChannels=outerLoopConfigs.doRemoveBadChannels,skipStuffThatKSGUIDoes=outerLoopConfigs.skipStuffThatKSGUIDoes,local_probeFolder=local_probeFolder,badChannelList=all_VE_config.badChannelList,bin_s_sessionCat=outerLoopConfigs.bin_s_sessionCat,doSaturationReplace=outerLoopConfigs.doSaturationReplace,silenceOrNoiseReplace=outerLoopConfigs.silenceOrNoiseReplace_sessionwise,floatDataTypeForDriftCorrection=True)
                 else:
-                    # multirec_info['multirec_start_sample'].append(int(
-                    #     multirec_info['multirec_start_sample'][i-1] + (multirec_info['duration'][i-1].total_seconds() * multirec_info['fs'][i-1])+1))
-
-                    outerLoopConfigs.multirec_info['multirec_start_sample'].append(
-                        outerLoopConfigs.multirec_info['multirec_start_sample'][i - 1] + (outerLoopConfigs.multirec_info['n_samples'][i - 1]) + 1)
-
-                # multirec_info['multirec_stop_sample'].append(int(multirec_info['multirec_start_sample'][i] + (multirec_info['duration'][i].total_seconds() * multirec_info['fs'][i])))
-                outerLoopConfigs.multirec_info['multirec_stop_sample'].append(
-                    outerLoopConfigs.multirec_info['multirec_start_sample'][i] + (outerLoopConfigs.multirec_info['n_samples'][i]))
-                outerLoopConfigs.multirec_info['fullpath_as_string'].append(list(probeFolder.glob('*.bin'))[0].__str__())
-
+                    local_probeFolder = all_VE_config.local_session_path / Path(*probeFolder.parts[-2:])
+                    recording = si.read_spikeglx(local_probeFolder, stream_id=all_VE_config.stream_id) ### will have already been preprocessed if done properly!
+                    if not (recording.dtype == 'float32'):
+                        recording = recording.astype(dtype="float32") ### must be the case for drift correction
                 if chan_map_name == all_VE_config.channel_map_to_use:  # I did this for basically no reason. The reason is because it fits the expected format of Jules and because someday I may want to organize things by the probe map.
                     if chan_map_name in dict_of_recordings:
                         dict_of_recordings[chan_map_name].append(recording)
@@ -121,13 +105,10 @@ def main():
 
                 else:
                     print('this line should never be reached')
-            # week_session_correspondance.append([week, i+last_session_previous_week]) ###TESTIFINEED ### I do need but hopefully not forever
-            # if i==len(currentSetOfSessions)-1: ###TESTIFINEED
-            #     last_session_previous_week+=i+1 ###TESTIFINEED
         if sessionLoopBreakFlag:
             sessionLoopBreakFlag = False
             continue
-        if outerLoopConfigs.doPreprocessing:
+        if actuallyRunDriftCorrection:
             if len(currentSetOfSessions) > 1:
                 multirecordings = {channel_map: si.concatenate_recordings(dict_of_recordings[channel_map]) for channel_map in dict_of_recordings}
                 multirecordings = {channel_map: multirecordings[channel_map].set_probe(dict_of_recordings[channel_map][0].get_probe())  for channel_map in multirecordings}
@@ -135,21 +116,11 @@ def main():
             else:
                 multirecordings = dict_of_recordings
                 multirecordingInput = multirecordings[all_VE_config.channel_map_to_use][0]
-        # recording = si.concatenate_recordings(dict_of_recordings)
 
-        # output_folder_temp = all_VE_config.output_folder / 'tempDir' / all_VE_config.ferret / all_VE_config.recordingZone / all_VE_config.sessionSetLabel / sessionSetName
-        # output_folder_sorted = all_VE_config.output_folder / 'spikesorted' / all_VE_config.ferret / all_VE_config.recordingZone / all_VE_config.sessionSetLabel / sessionSetName
-        output_folder_temp = all_VE_config.output_folder / 'tempDir' / all_VE_config.ferret / all_VE_config.sessionSetLabel
-        output_folder_sorted = all_VE_config.output_folder / 'spikesorted' / all_VE_config.ferret / all_VE_config.sessionSetLabel
-        motionMapFolder_used = all_VE_config.motionMapFolder / 'spikesorted' / all_VE_config.ferret / all_VE_config.sessionSetLabel
-
-        phy_folder = output_folder_sorted / 'KiloSortSortingExtractor' / 'phy_folder'  # probably.
-        ### save multirec_info
-        phy_folder.mkdir(parents=True, exist_ok=True)
-        #multirecordingInput = multirecordingInput.remove_channels(badChannelList)
-
-        if all_VE_config.doMultipleShanks: ### Currently, should always be true.
-            if outerLoopConfigs.doPreprocessing: # loading and processing are pretty well split this time, the result of the load will be in a different format. Plotting will be load-relegated, drift saving will be here (maybe later, both)
+        motionMapFolder_used = all_VE_config.motionMapFolder / all_VE_config.ferret / all_VE_config.sessionSetLabel ### recently removed a redundant "spikesorted" from this folder chain.
+        uncalibratedSamplingRate = 30000 ### named as such so that it is noticable. Want to deal with this soon. Probably doesn't actually matter even a little for this application, though.
+        if all_VE_config.doMultipleShanks: ### Currently, should always be true. In fact, as you can see, there isn't even another choice.
+            if actuallyRunDriftCorrection: # loading and processing are pretty well split this time, the result of the load will be in a different format. Plotting will be load-relegated, drift saving will be here (maybe later, both)
             ### first split shanks.
                 for ixi,currentRecording in enumerate(multirecordingInput.recording_list): ### malheurusement I need to do my shank splitting on each session pre-concatenation... I can either do that here or earlier... But it actually is not so big a deal to just do it here, let's do it here.
                     if not ixi: # initialize on first loop.
@@ -163,7 +134,7 @@ def main():
                 motionMapFolder_used.mkdir(parents=True, exist_ok=True)
                 np.save(motionMapFolder_used / "shank_ids_all_channels", shank_ids_all_channels)
                 ## save the "sessionEnds" times. Because for an si specific reason, the individual sessions don't play nice when you concatenate them...
-                sessionEnds = np.asarray(multirecordingInput._recording_segments[0].all_length)/30000
+                sessionEnds = np.asarray(multirecordingInput._recording_segments[0].all_length)/uncalibratedSamplingRate
                 sessionEnds = np.cumsum(sessionEnds)
                 np.save(motionMapFolder_used / "sessionEnds", sessionEnds)
 
@@ -195,7 +166,7 @@ def main():
 
                     if outerLoopConfigs.savePreprocessing: ### need to make changes to this to either save each shank seperately or to save them all together... Should also have a list of channel-group matchups.
                         shankfolderName = Path("Shank_" + str(shankCount)) ### I did not check if group number and absolute shank number align. Probably they do.
-                        picklePath = output_folder_sorted / shankfolderName
+                        picklePath = motionMapFolder_used / shankfolderName ### I save them to the spikesorting output folder, which is if nothing else, odd.
                         picklePath.mkdir(parents=True, exist_ok=True)
                         pickleName = 'preprocess_results.pkl'
                         if (not (picklePath / pickleName).is_file())|outerLoopConfigs.overwritePreprocessing:
@@ -291,7 +262,7 @@ def main():
             else:
                 for folderCount,shankfolderName in enumerate(list(motionMapFolder_used.glob('Shank_[0-9]'))):
 
-                    picklePath = output_folder_sorted / shankfolderName
+                    picklePath = motionMapFolder_used / shankfolderName
                     pickleName = 'preprocess_results.pkl'
                     if (not (picklePath / pickleName).is_file())|outerLoopConfigs.overwritePreprocessing:
                         with open(picklePath / pickleName, 'rb') as file:
@@ -304,7 +275,6 @@ def main():
                     peak_locations_after = pickleJar["peak_locations_after"]
 
                     if outerLoopConfigs.checkMotionPlotsOnline:
-                        matplotlib.use(outerLoopConfigs.matplotlibGUItype)
                         scatterArray = np.zeros((len(peak_locations), 3))
                         xLocationToCheckShank = np.zeros((len(peak_locations), 1))
                         for iiii in range(0, len(peak_locations)):
@@ -334,88 +304,6 @@ def main():
 
 
                         breakPointSpot = "here"
-
-                    if outerLoopConfigs.calculateSessionMotionDisplacement:
-                        # sessionEnds = np.asarray(multirecordingThisShank._recording_segments[0].all_length)/30000
-                        # sessionEnds = np.cumsum(sessionEnds)
-                        # Recording average motion over a week
-                        sessionEnds = np.load((motionMapFolder_used / "sessionEnds.npy")) ### must be loaded
-                        motion_space = motion.displacement
-                        motion_space = motion_space[0]
-                        bins_per_session=[]
-                        bins_per_session_numpyStyle = np.zeros((len(sessionEnds),motion_space.shape[1]))
-                        for count,i in enumerate(sessionEnds):
-                            end_session_bin= np.where(motion.temporal_bin_edges_s[0] < i)
-                            endSessionBin = end_session_bin[0][-1]-1
-                            if i==sessionEnds[0]:
-                                bins_per_session.append(np.mean(motion_space[0:endSessionBin], axis=0))
-                                bins_per_session_numpyStyle[count,:] = np.mean(motion_space[0:endSessionBin], axis=0)
-                            else:
-                                bins_per_session.append(np.mean(motion_space[prev_end_session_bin:endSessionBin], axis=0))
-                                bins_per_session_numpyStyle[count,:] = np.mean(motion_space[prev_end_session_bin:endSessionBin], axis=0)
-                            prev_end_session_bin = endSessionBin
-                        motion_average = np.mean(motion_space, axis=0)
-                        record_motion_this_shank = [] # used to be record_motion_weeks, but we no longer actually want that format anyway and it was causing bugs.
-                        record_space_this_shank = []
-                        record_motion_sessions = []
-                        record_space_bins_sessions = []
-                        if not sessionSetCount:
-                            record_motion_this_shank.append(motion_average)
-                            record_space_this_shank.append(motion.spatial_bins_um)
-                            for i in bins_per_session:
-                                record_motion_sessions.append(i)
-                                record_space_bins_sessions.append(motion.spatial_bins_um)
-                        else:
-                            record_motion_this_shank.append(motion_average)
-                            record_space_this_shank.append(motion.spatial_bins_um + record_motion_this_shank[sessionSetCount-1])
-                            for i in bins_per_session:
-                                record_motion_sessions.append(i)
-                                record_space_bins_sessions.append(motion.spatial_bins_um + record_motion_this_shank[sessionSetCount-1])
-                            #record_motion.append(record_motion[sessionSetCount-1]+motion_average)
-                        #record_space_bins.append(motion.spatial_bins_um)
-                        breakPointSpot = "here"
-
-
-                    ### the following will have been designed to have looped multiple times maybe, but we don't need that functionality.
-                        # week+=1 # just in case, but I don't see this variable... ###TESTIFINEED
-
-                        record_motion_this_shank = np.array(record_motion_this_shank)
-                        record_space_this_shank = np.array(record_space_this_shank)
-                        N, M = record_motion_this_shank.shape
-                        rows = []
-                        for i in range(N):
-                            for j in range(M):
-                                rows.append((all_VE_config.sessionsToDo[i], record_motion_this_shank[i, j], record_space_this_shank[i, j])) ### WARNING use of sessionsToDo may be wrong here
-
-                        df_weeks = pd.DataFrame(rows, columns=["session_week", "motion", "center_space_bin"])
-
-                        record_motion_sessions = np.array(record_motion_sessions)
-                        record_space_bins_sessions = np.array(record_space_bins_sessions)
-                        N, M = record_motion_sessions.shape
-                        rows = []
-                        for i in range(N):
-                            for j in range(M):
-                                rows.append((i, record_motion_sessions[i, j], record_space_bins_sessions[i, j]))
-
-                        df_sessions = pd.DataFrame(rows, columns=["session", "motion", "center_space_bin"])
-                        if outerLoopConfigs.resaveMotionIfLoadingPreprocessing:
-                            motionSaveFolder = motionMapFolder_used / shankfolderName
-                            motionSaveFolder.mkdir(parents=True, exist_ok=True)
-
-                            # df_weeks.to_csv(motionSaveFolder / "motion_weeks.csv", index=False)
-                            df_sessions.to_csv(motionSaveFolder / "motion_sessions.csv", index=False) ### This should be the only one to care about but currently the others are needed for things to work.
-                            # week_session_correspondance = np.array(week_session_correspondance)
-                            # np.save(motionSaveFolder / "session_to_week_id", week_session_correspondance)
-
-                            ## below is new thing to help track which shank is on which channel.
-                            channelIDsThisShank = multirecordingThisShank.channel_ids[:]
-                            numericID = np.zeros(len(channelIDsThisShank),dtype=int)
-                            for i,stringID in enumerate(channelIDsThisShank):
-                                numericID[i] = int(stringID[(stringID.find('AP')+2):]) # will not work if there aren't zeros in front.
-                            # Save to CSV
-                            np.save(motionSaveFolder / "Absolute_IDs_this_slice", numericID)
-
-                        pass
 
 
 

@@ -12,7 +12,7 @@ sessionString = '[0-9][0-9]*' # this is a default regular expression to get the 
 
 if projectLabel == 'Jeffrey':
     computerUsed = 'JeffreyLabDesktop' # if you plan to analyze on multiple computers and have different local addresses for things, this is how you can account for that.
-
+    bhv_fs = 24414.062500  ### for Nellie
     # the below are parameters you may want to keep. If you don't, make your own and name it something else.
     sessionwiseDriftCorrectionArguments = 'JeffreyRecommended'
     generalSpikesortingArguments = 'JeffreyRecommended'
@@ -27,21 +27,23 @@ if projectLabel == 'Jeffrey': ### here will be ferret specific arguments
     # recordingZone = 'ACx_Boule_top_tipref_March2025'
     #recordingZone = 'PFC_Boule_Borders_Top_GroundrefIThink'
     #recordingZone = 'PFC_Boule_Borders_Top'
-    recordingZone = 'PFC_shank0_Challah'
+    # recordingZone = 'PFC_shank0_Challah'
     #recordingZone = 'PFC_shank3_Challah'
     #recordingZone = "ACx_Challah_top_groundref_June2024"
-    # recordingZone = "ACx_Challah_top_groundref_May2024"
+    recordingZone = "ACx_Challah_top_groundref_May2024"
     # recordingZone = "Challah_Survey" ### intended to be an adaptable set for if I want to spikesort a specific survey
     sessionsToDo = 'all'
     frequencyOfConcatenation = 'do_everything' #'weekly_heuristic' or 'do_everything'. do_everything is contained per probemap.
 
 ###### PROBEBANK SPECIFIC PARAMETERS JEFFREY
-
+pairedSessionSetLabel = '' ### initialize as blank.
 if projectLabel == 'Jeffrey': # contains probemap specific stuff. First set contains commentary where necessary.
     if recordingZone == 'ACx_Challah_top_groundref_May2024':
         stream_id = 'imec0.ap' # unreliably identifies the probe. Unfortunately can misidentify when small details change. Currently code relies on it, we need to find ways around it though.
         sessionSetLabel = 'All_ACx_Top_groundref_MonthOfMay2024' # this will become the folder name for the output, and is also used to create the regular expression that identifies the sessions you want to include.
+        pairedSessionSetLabel = 'PFC_shank0_MonthOfMay2024'
         channel_map_to_use = 'Challah_top_b1_horizontal_band_ground.imro' # the name of the channel map. This is a more reliable way of identifying a probe/map, since we don't tend to use the same maps on multiple probes.
+        pairedSessionsFolderLabel = 'May2024' ### don't think this is used? Maybe
         #channel_map_to_use_other_ref = 'Challah_top_b1_horizontal_band_joint_tip.imro' ### this wouldn't actually work...
         badChannelList = [66,105,149,170,175,209,210,239,354,369] # bad channels, manually found and labeled. These tend to be highly reliable from implant to end-of-experiment. They will be removed from all analyses.
         ferret = 'F2302_Challah'
@@ -70,6 +72,8 @@ if projectLabel == 'Jeffrey': # contains probemap specific stuff. First set cont
     elif recordingZone == 'PFC_shank0_Challah':
         stream_id = 'imec1.ap'
         sessionSetLabel = 'PFC_shank0_MonthOfMay2024'#'PFC_shank0'
+        pairedSessionSetLabel = 'All_ACx_Top_groundref_MonthOfMay2024'
+        pairedSessionsFolderLabel = 'May2024'
         channel_map_to_use = 'Challah_top_PFC_shank0.imro'
         badChannelList = [21,109,133,170,181,202,295,305,308,310,327,329,339]
         # something else also. Need to read metadata
@@ -152,6 +156,9 @@ if projectLabel == 'Jeffrey':
     elif computerUsed == 'ExternalDriveD':
         output_folder = Path('D:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Output')
     sessionSetSortedFolder = output_folder / ferret / sessionSetLabel
+
+    if len(pairedSessionSetLabel) > 0:
+        sessionSetPairedSortedFolder = output_folder / ferret / pairedSessionSetLabel ### for if you are comparing two sets of recordings which have different involved folders. If you aren't doing that, this should be meaningless.
     NAS_neural_data = Path('Z:/Data/Neuropixels/')
     if SurveyOverride:
         NAS_neural_data = NAS_neural_data / Path('Surveys')
@@ -163,10 +170,11 @@ if projectLabel == 'Jeffrey':
 
     behavior_path = Path("C:/Users/jeff/Dropbox/Data/" +ferret)
     figure_folder = Path('D:/Jeffrey/Projects/SpeechAndNoise/figures/')
-    FolderWithPickles = output_folder  / Path('tempDir/' +ferret + '/' + sessionSetLabel + '/FolderWithPickles') ### I will want to change this Once I undersd
+    FolderWithPickles = sessionSetSortedFolder  / Path('FolderWithPickles') ### I will want to change this Once I undersd
+    if len(pairedSessionSetLabel) > 0:
+        FolderWithPickles2 = sessionSetPairedSortedFolder  / Path('FolderWithPickles')
 
-
+    sessionSet_aux_folders = NAS_neural_data / ferret
 
 ###### very basic and probably unnecessary information, but which is good to have
-
 probeType = 'neuropixels'

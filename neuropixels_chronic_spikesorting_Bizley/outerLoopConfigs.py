@@ -26,6 +26,7 @@ if all_VE_config.plottingArguments == 'JeffreyRecommended':
 ###### SPIKESORTING PARAMETERS
 
 if all_VE_config.generalSpikesortingArguments == 'JeffreyRecommended':
+    ### these should really not be here, they should be above get_drift_per_session.
     desired_n_jobs = 16 # this is where you can set up parallel processing. -1 for all available cores. Sometimes some code breaks when you try to parallel process; you can set to 1 to bypass those problems in exchange for things running slow.
     si.set_global_job_kwargs(n_jobs=desired_n_jobs)
     doRemoveBadChannels = 1  # currently uses the manual list... I doubt you'll ever want to turn this off.
@@ -48,7 +49,7 @@ if all_VE_config.withinSessionSpikesortingArguments == 'JeffreyRecommended':
 ###### SAVING PARAMETERS SPIKESORTING
 
 if all_VE_config.projectLabel == 'Jeffrey': # arguments handling how much code to run
-    doPreprocessing = 1 # if you want to load your drift maps without recalculating them, turn this off.
+    doPreprocessing = 0 # if you want to load your drift maps without recalculating them, turn this off.
     savePreprocessing = 1
     overwritePreprocessing = 1
     resaveMotionIfLoadingPreprocessing = 0 # if you turn off preprocessing, you can either resave new motion correction stuff or not. Kept off by default for safety.
