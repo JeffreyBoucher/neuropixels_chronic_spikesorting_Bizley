@@ -64,7 +64,8 @@ if all_VE_config.projectLabel == 'Jeffrey': # arguments handling how much code t
         print('WARNING WARNING TESTING TESTING')
         print('WARNING WARNING TESTING TESTING')
     if not doPreprocessing:
-        print('warning: not doing any preprocessing.')
+        pass
+        # print('warning: not doing any preprocessing.') ### need to move this warning to be get_drift_per_session specific
 
 
 ###### IMPLEMENTATION OF FREQUENCY OF CONCATENATION

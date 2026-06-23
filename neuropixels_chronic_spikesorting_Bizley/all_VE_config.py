@@ -19,6 +19,8 @@ if projectLabel == 'Jeffrey':
     withinSessionSpikesortingArguments = 'JeffreyRecommended'
     plottingArguments = 'JeffreyRecommended'
     make_multirecording_info = 'JeffreyRecommended'
+    runOneSessionSetOldStyle = False ### if False, ignores everything but the paths and the ferret, and instead builds out a list of session sets to do sequentially.
+    doMultipleShanks = True # this will never not be true and I'll move it elsewhere pretty soon. Because even with one shank, you want to treat it as multiple.
 
 ###### FERRET AND FILE NAME PARAMETERS
 
@@ -30,15 +32,27 @@ if projectLabel == 'Jeffrey': ### here will be ferret specific arguments
     # recordingZone = 'PFC_shank0_Challah'
     #recordingZone = 'PFC_shank3_Challah'
     #recordingZone = "ACx_Challah_top_groundref_June2024"
-    recordingZone = "ACx_Challah_top_groundref_May2024"
+    # recordingZone = "ACx_Challah_top_groundref_May2024"
     # recordingZone = "Challah_Survey" ### intended to be an adaptable set for if I want to spikesort a specific survey
+    # recordingZone = "Challah" ### intended to be used with the new method which does all recording zones in a loop.
+    recordingZone = "Boule"
     sessionsToDo = 'all'
     frequencyOfConcatenation = 'do_everything' #'weekly_heuristic' or 'do_everything'. do_everything is contained per probemap.
 
 ###### PROBEBANK SPECIFIC PARAMETERS JEFFREY
 pairedSessionSetLabel = '' ### initialize as blank.
 if projectLabel == 'Jeffrey': # contains probemap specific stuff. First set contains commentary where necessary.
-    if recordingZone == 'ACx_Challah_top_groundref_May2024':
+    if recordingZone == 'Challah':
+        ferret = 'F2302_Challah'
+        ferret_no_id = 'Challah'
+        regionLabels = ['AC','PFC'] ### will be iterated through later.
+        sessionSetLabel = '' ### unused but needs to have a value
+    elif recordingZone == 'Boule':
+        ferret = 'F2301_Boule'
+        ferret_no_id = 'Boule'
+        regionLabels = ['AC','PFC'] ### will be iterated through later.
+        sessionSetLabel = '' ### unused but needs to have a value
+    elif recordingZone == 'ACx_Challah_top_groundref_May2024':
         stream_id = 'imec0.ap' # unreliably identifies the probe. Unfortunately can misidentify when small details change. Currently code relies on it, we need to find ways around it though.
         sessionSetLabel = 'All_ACx_Top_groundref_MonthOfMay2024' # this will become the folder name for the output, and is also used to create the regular expression that identifies the sessions you want to include.
         pairedSessionSetLabel = 'PFC_shank0_MonthOfMay2024'
@@ -151,11 +165,11 @@ if projectLabel == 'Jeffrey': # manages the highest-level selection of sessions 
 ###### folder names
 if projectLabel == 'Jeffrey':
     if computerUsed == 'JeffreyLabDesktop': # contains folder and file arguments, including higher-level ones like ferret name. Likely to be specific to my project
-        output_folder = Path('C:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Output') ### this is the lower-level spot for spikesorted output, specified to ferret after the if statement.
+        output_folder = Path('D:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Output') ### this is the lower-level spot for spikesorted output, specified to ferret after the if statement.
         motionMapFolder = Path('C:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Inputs/SessionSetDriftmaps')
     elif computerUsed == 'ExternalDriveD':
         output_folder = Path('D:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Output')
-    sessionSetSortedFolder = output_folder / ferret / sessionSetLabel
+    # sessionSetSortedFolder = output_folder / ferret / sessionSetLabel ### not used anymore, unfortunately breaks FolderWithPickles
 
     if len(pairedSessionSetLabel) > 0:
         sessionSetPairedSortedFolder = output_folder / ferret / pairedSessionSetLabel ### for if you are comparing two sets of recordings which have different involved folders. If you aren't doing that, this should be meaningless.
@@ -170,9 +184,9 @@ if projectLabel == 'Jeffrey':
 
     behavior_path = Path("C:/Users/jeff/Dropbox/Data/" +ferret)
     figure_folder = Path('D:/Jeffrey/Projects/SpeechAndNoise/figures/')
-    FolderWithPickles = sessionSetSortedFolder  / Path('FolderWithPickles') ### I will want to change this Once I undersd
-    if len(pairedSessionSetLabel) > 0:
-        FolderWithPickles2 = sessionSetPairedSortedFolder  / Path('FolderWithPickles')
+    # FolderWithPickles = sessionSetSortedFolder  / Path('FolderWithPickles') ### broken due to new SessionSet system. Need to repair. ### I will want to change this Once I undersd
+    # if len(pairedSessionSetLabel) > 0:
+    #     FolderWithPickles2 = sessionSetPairedSortedFolder  / Path('FolderWithPickles')
 
     sessionSet_aux_folders = NAS_neural_data / ferret
 

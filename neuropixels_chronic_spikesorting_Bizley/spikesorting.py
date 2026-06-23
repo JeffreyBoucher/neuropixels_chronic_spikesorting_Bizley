@@ -45,7 +45,7 @@ def makeAndProcessRaw(NAS_session_path,session_name,stream_id,local_session_path
 
 
     # catgt_command = catgt.dry_run()  ### dry_run() generates a string for you. Look at it if you want to check.
-    dir_string = '-dir=' + str(NAS_session_path) ### this should be all_VE_config.NAS_session_path, though I passed it as an argument instead of importing. It specifies where the file should come from.
+    dir_string = '-dir=' + str(NAS_session_path) ### this should be all_VE_config.NAS_session_path, though I passed it as an argument instead of importing (good decision, later I would have regretted it). It specifies where the file should come from.
     run_string = '-run=' + session_name[:-3] ### this is the name of the session folder, without the _g#.
     prb_string = '-prb=' + stream_id[-4] ### the imec number of the probe.
     g_string = '-g=' + session_name[-1] ### the number next to g. Almost always 0, unless an error happened.
