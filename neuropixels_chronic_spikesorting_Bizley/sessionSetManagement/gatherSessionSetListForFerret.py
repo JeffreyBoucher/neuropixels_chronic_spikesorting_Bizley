@@ -10,13 +10,17 @@ def gatherSessionSetListForFerret(ferret):
     ### this manually instead of with a loop.
     #### Comment out ones you want to ignore.
     if ferret == 'F2302_Challah':
-        recordingZones = {'SessionSet01', ### first set, May 2024
+        recordingZones = {
+                          'SessionSet01', ### first set, May 2024
                           'SessionSet02', ### second set, June 2024
                           'SessionSet03', ### third set, July 2024. Some PFC problems, not an overwhelming amount.
                           'SessionSet04', #/# ### July into August. Pulse problems begin. If I want the good PFC data I need this dealt with. Or I need to figure out how to process the PFC data well. I have marked sets where I think the PFC data is tolerable but I have this issue with "##". There are four. So I have a lot of data to gain from it.
                           'SessionSet05', #/# ### August into sept
                           'SessionSet06', #/# ### sept into oct
                           'SessionSet07', #/# NOTONNAS ### oct into nov. Also apparently this set isn't on the nas, should deal with that
+
+
+
                           # 'SessionSet08', ### nov into dec, not on harddrive This is also approximately where I give up hope on good PFC data
                           # 'SessionSet09', ### Jan into feb, includes 4 weeks and a gap?
                           # 'SessionSet10', ### pulse issue gone! Intermittant freezing starts though. Feb to March

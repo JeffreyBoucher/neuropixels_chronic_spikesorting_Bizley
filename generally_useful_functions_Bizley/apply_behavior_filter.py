@@ -32,7 +32,7 @@ def apply_behavior_filter(df, filter,window = [-1,2],dp = None,evtype = None,met
         return df[df['correct'] == 1]
     if filter == 'Noiseless':
         return df[df['currNoiseAtten'] == 120]
-    if filter == 'Noiseful':
+    if (filter == 'Noiseful')|(filter == 'Noiseful_stricter'):
         return df[df['currNoiseAtten'] < 0] # a bit stricter... I have sessions where apparently ferrets will have 5 and 10. That could mean anything.
         #return df[df['currNoiseAtten'] < 100]
     if filter == 'TrialDoesNotEnd':
@@ -58,8 +58,11 @@ def apply_behavior_filter(df, filter,window = [-1,2],dp = None,evtype = None,met
         return df[(df['response'] == 5) | (df['response'] == 7)]
     if filter == 'Hit and FA':
         return df[(df['response'] == 1) | (df['response'] == 0) | (df['response'] == 5)]
-    if filter == 'Hit and Miss':
+    if filter == 'Hit and Miss and Wrong Direction': ### used to be Hit and Miss but does not exclude Wrong Direction
         return df[(df['response'] == 1) | (df['response'] == 0) | (df['response'] == 7)]
+    if filter[0:7] == 'ILD_dB_':
+        ILD_requested = int(filter[7:10])
+        return df[df['currentILD'] == ILD_requested]
     if filter == 'Exclude_Saturations':
         ev_times = df[evtype].to_numpy()
         lower_bound = ev_times + window[0] ### lower bound of time to exclude as recorded in behavior file

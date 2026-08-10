@@ -13,6 +13,7 @@ sessionString = '[0-9][0-9]*' # this is a default regular expression to get the 
 if projectLabel == 'Jeffrey':
     computerUsed = 'JeffreyLabDesktop' # if you plan to analyze on multiple computers and have different local addresses for things, this is how you can account for that.
     bhv_fs = 24414.062500  ### for Nellie
+    dateFormat = '%d%m%Y' ### format for how I saved dates.
     # the below are parameters you may want to keep. If you don't, make your own and name it something else.
     sessionwiseDriftCorrectionArguments = 'JeffreyRecommended'
     generalSpikesortingArguments = 'JeffreyRecommended'
@@ -34,8 +35,8 @@ if projectLabel == 'Jeffrey': ### here will be ferret specific arguments
     #recordingZone = "ACx_Challah_top_groundref_June2024"
     # recordingZone = "ACx_Challah_top_groundref_May2024"
     # recordingZone = "Challah_Survey" ### intended to be an adaptable set for if I want to spikesort a specific survey
-    # recordingZone = "Challah" ### intended to be used with the new method which does all recording zones in a loop.
-    recordingZone = "Boule"
+    recordingZone = "Challah" ### intended to be used with the new method which does all recording zones in a loop.
+    # recordingZone = "Boule"
     sessionsToDo = 'all'
     frequencyOfConcatenation = 'do_everything' #'weekly_heuristic' or 'do_everything'. do_everything is contained per probemap.
 
@@ -166,9 +167,11 @@ if projectLabel == 'Jeffrey': # manages the highest-level selection of sessions 
 if projectLabel == 'Jeffrey':
     if computerUsed == 'JeffreyLabDesktop': # contains folder and file arguments, including higher-level ones like ferret name. Likely to be specific to my project
         output_folder = Path('D:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Output') ### this is the lower-level spot for spikesorted output, specified to ferret after the if statement.
-        motionMapFolder = Path('C:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Inputs/SessionSetDriftmaps')
+        # motionMapFolder = Path('C:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Inputs/SessionSetDriftmaps')
+        LFP_folder = Path('D:/Jeffrey/Projects/SpeechAndNoise/LFP_Output')
     elif computerUsed == 'ExternalDriveD':
         output_folder = Path('D:/Jeffrey/Projects/SpeechAndNoise/Spikesorting_Output')
+        LFP_folder = Path('D:/Jeffrey/Projects/SpeechAndNoise/LFP_Output')
     # sessionSetSortedFolder = output_folder / ferret / sessionSetLabel ### not used anymore, unfortunately breaks FolderWithPickles
 
     if len(pairedSessionSetLabel) > 0:

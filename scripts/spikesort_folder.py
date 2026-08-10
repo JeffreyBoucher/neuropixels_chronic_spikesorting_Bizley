@@ -1,33 +1,24 @@
 from pathlib import Path
-import pickle
-import matplotlib
-import matplotlib.pyplot as plt
-import torch
 import pandas as pd
 from itertools import product as combination_product
 
-
-import spikeinterface.extractors as se
-import os
 import numpy as np
 import shutil
 
 import spikeinterface.full as si
-import spikeinterface.sortingcomponents.motion as sm
 
 import kilosort as ks
 
 
-from neuropixels_chronic_spikesorting_Bizley.helpers.helpers_spikesorting_scripts import sort_np_sessions, get_channelmap_names, getSessionsWithinMap
-from neuropixels_chronic_spikesorting_Bizley.spikesorting import spikesorting_pipeline, spikesorting_postprocessing, applyOverStrike, nullify_saturations, spikeglx_preprocessing, makeAndProcessRaw
-from neuropixels_chronic_spikesorting_Bizley.helpers.npyx_metadata_fct import load_meta_file
-from neuropixels_chronic_spikesorting_Bizley.helpers.getSessionsWithinMapForSessionSet import getSessionsWithinMapForSessionSet
+from neuropixels_chronic_spikesorting_Bizley.helpers.helpers_spikesorting_scripts import get_channelmap_names, getSessionsWithinMap
+from neuropixels_chronic_spikesorting_Bizley.spikesorting import applyOverStrike, nullify_saturations, makeAndProcessRaw, getLFP
+from neuropixels_chronic_spikesorting_Bizley.sessionSetManagement.getSessionsWithinMapForSessionSet import getSessionsWithinMapForSessionSet
 from generally_useful_functions_Bizley.getCorrectRecordingForRegion import getCorrectRecordingForRegion
 
 import neuropixels_chronic_spikesorting_Bizley.outerLoopConfigs as outerLoopConfigs
 import neuropixels_chronic_spikesorting_Bizley.all_VE_config as all_VE_config # this config file should be synced between all your VEs.
-from neuropixels_chronic_spikesorting_Bizley.gatherSessionSetListForFerret import gatherSessionSetListForFerret
-from neuropixels_chronic_spikesorting_Bizley.SpecifySessionSetParameters import SpecifySessionSetParameters
+from neuropixels_chronic_spikesorting_Bizley.sessionSetManagement.gatherSessionSetListForFerret import gatherSessionSetListForFerret
+from neuropixels_chronic_spikesorting_Bizley.sessionSetManagement.SpecifySessionSetParameters import SpecifySessionSetParameters
 
 def main():
 
@@ -38,8 +29,10 @@ def main():
     overwriteSpikesorting = False # determines whether you redo spikesortings that are already done. Overwrite when you try new things, don't sh
     createCompressed = False # determines whether you create compressed raw. Good to do if you need the space, but all processing requires unpacking it.
     doSpikeSorting = True
-    copyAuxData = True
+    copyAuxData = False
     overwriteAuxData = False
+    saveLFP = True ### saves an additional raw file which is focused on the LFP. Will be downsampled to 1000 Hz
+    overwriteLFP = False
 
     #get sessions within map
     if all_VE_config.runOneSessionSetOldStyle:
@@ -65,8 +58,14 @@ def main():
             sessionSetParams = SpecifySessionSetParameters(sessionSet[0],sessionSet[1],sessionSet[2])
             NAS_SessionsWithinMap,Local_SessionsWithinMap = getSessionsWithinMapForSessionSet(sessionSetParams)
             (all_VE_config.output_folder / sessionSet[0] / sessionSet[1] / sessionSet[2]).mkdir(parents=True, exist_ok=True)
+            if saveLFP:
+                LFP_sessionSet_folder =  all_VE_config.LFP_folder / sessionSet[0] / sessionSet[1] / sessionSet[2]
+                LFP_sessionSet_folder.mkdir(parents=True, exist_ok=True)
+
             errorFileName =  all_VE_config.output_folder / sessionSet[0] / sessionSet[1] / sessionSet[2] / "errorTracking.txt"
         for i, session in enumerate(NAS_SessionsWithinMap):
+            if i == 18:
+                pass
             multirec_info = {'name': [],
                              'start_time': [],
                              # 'stop_time': [],
@@ -80,8 +79,7 @@ def main():
             session_name = session.name
 
             print(f'Processing {session_name}')
-            NAS_currentDataPath = all_VE_config.NAS_session_path / session_name
-            imecFolderList = list(NAS_currentDataPath.glob('*' + 'imec' + '*'))
+            imecFolderList = list(session.glob('*' + 'imec' + '*'))
             metaFileData,usedImro,NASprobeFolder = getCorrectRecordingForRegion(imecFolderList,sessionSetParams['channel_map_to_use'],localData=False)
             if metaFileData == None:
                 with open(errorFileName, "a") as f:
@@ -108,7 +106,6 @@ def main():
                         print('saturation detection failed for ' + session_name + ' for ' + sessionSetParams['channel_map_to_use'], file=f)
                         continue
             if (not any((list(rawFolderName.glob('*.bin'))))) | overwriteRaw: # if you don't have a raw or you say you want to overwrite it, we make a new raw.
-                ### currently, I do not have a saturation removal function because my old one depended on SI. To be dealt with later.
                 try:
                     makeAndProcessRaw(NAS_session_path = all_VE_config.NAS_session_path,session_name=session_name,stream_id=usedImro,local_session_path=all_VE_config.local_session_path,badChannelList=sessionSetParams['badChannelList'],catgt_location=outerLoopConfigs.catgt_location,rawFolderName=rawFolderName,overwriteRaw = overwriteRaw,createCompressed = createCompressed)
                     if outerLoopConfigs.doSaturationReplace: # requires saying you will overwrite. I hope that is natural.
@@ -117,7 +114,18 @@ def main():
                     with open(errorFileName, "a") as f:
                         print('preprocessed raw creation failed for ' + session_name + ' for ' + sessionSetParams['channel_map_to_use'], file=f)
                         continue
+            if saveLFP:
+                LFP_session_folder = LFP_sessionSet_folder / session_name
+                LFP_session_folder.mkdir(parents=True, exist_ok=True)
+                try:
+                    if (not any((list(LFP_session_folder.glob('*.bin'))))) | overwriteLFP:
+                        getLFP(NAS_session_path = all_VE_config.NAS_session_path,session_name=session_name,stream_id=usedImro,LFP_session_folder=LFP_session_folder,badChannelList=sessionSetParams['badChannelList'],catgt_location=outerLoopConfigs.catgt_location,overwriteLFP = overwriteLFP,doSaturationReplace = outerLoopConfigs.doSaturationReplace,windowsToSilenceArray=windowsToSilenceArray)
 
+                except:
+                    with open(errorFileName, "a") as f:
+                        print('LFP creation failed for ' + session_name + ' for ' + sessionSetParams['channel_map_to_use'], file=f)
+
+                pass
             recording = si.read_spikeglx(rawFolderName, stream_id=usedImro) ### use si just to read the meta file.
 
 
@@ -165,7 +173,7 @@ def main():
             multirec_info['multirec_stop_sample'].append(
                 multirec_info['multirec_start_sample'][0] + (multirec_info['n_samples'][0]))
             multirec_info['fullpath_as_string'].append(list(NASprobeFolder.glob('*.bin'))[0].__str__())
-            chan_dict = get_channelmap_names(NAS_currentDataPath)  ### I should figure out how to get rid of this... Works fine for now.
+            chan_dict = get_channelmap_names(session)  ### I should figure out how to get rid of this... Works fine for now.
             chan_map_name = chan_dict[session_name + "_" + usedImro[:-3]]
 
             if chan_map_name == sessionSetParams['channel_map_to_use']:  # I did this for basically no reason. The reason is because it fits the expected format of Jules and because someday I may want to organize things by the probe map.
