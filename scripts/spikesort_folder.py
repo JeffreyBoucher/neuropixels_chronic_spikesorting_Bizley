@@ -32,7 +32,7 @@ def main():
     copyAuxData = False
     overwriteAuxData = False
     saveLFP = True ### saves an additional raw file which is focused on the LFP. Will be downsampled to 1000 Hz
-    overwriteLFP = False
+    overwriteLFP = True
 
     #get sessions within map
     if all_VE_config.runOneSessionSetOldStyle:
@@ -64,8 +64,6 @@ def main():
 
             errorFileName =  all_VE_config.output_folder / sessionSet[0] / sessionSet[1] / sessionSet[2] / "errorTracking.txt"
         for i, session in enumerate(NAS_SessionsWithinMap):
-            if i == 18:
-                pass
             multirec_info = {'name': [],
                              'start_time': [],
                              # 'stop_time': [],
