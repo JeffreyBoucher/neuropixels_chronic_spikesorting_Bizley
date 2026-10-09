@@ -5,7 +5,7 @@ import spikeinterface.full as si
 import matplotlib.pyplot as plt
 import spikeinterface.widgets as sw
 
-import neuropixels_chronic_spikesorting_Bizley.externalBugFixes.spike_interface.v_103_0.silence_periods as silence_periods_file
+# import neuropixels_chronic_spikesorting_Bizley.externalBugFixes.spike_interface.v_103_0.silence_periods as silence_periods_file
 import neuropixels_chronic_spikesorting_Bizley.config as global_configs
 import torch
 import pickle
@@ -159,6 +159,35 @@ def getLFP(NAS_session_path,session_name,stream_id,LFP_session_folder,badChannel
             run_in_path = str(OverStrike_location) + '\\' + overStrikeCommand
             subprocess.Popen(run_in_path).wait()
             pass
+
+def preprocessing_for_drift_correction(recording,doRemoveBadChannels=True,local_probeFolder=None,badChannelList=None,doSaturationReplace=False,silenceOrNoiseReplace='noise',floatDataTypeForDriftCorrection=False): ### not quite defunct because I use it for the sessionwise drift correction.
+    # before drift correction the preprocessing you want is very minimal. phase correction is probably a good idea.
+    # Bad channel removal can be too, but also it can be good to keep them so that you can see if your correction is working
+    # (because they will be fully horizontal lines across sessions uncorrected, which you can compare to the corrected real spikes)
+    # a thing that you certainly don't want to do is CAR or filter.
+    # a thing that you NEED to do is make it float32 (or 64) because spikeinterface works terribly with int data.
+    recording = si.phase_shift(recording) #mandatory for NP recordings because the channels are not sampled at the same time.
+
+    if doRemoveBadChannels: # next remove bad channels
+        #bad_channel_ids, channel_labels = si.detect_bad_channels(recording) # this seems not as good as I need it to be... Totally misses all my bad channels. Maybe just need to change parameters...
+        #recording = recording.remove_channels(bad_channel_ids) # I don't want to remove them here because I am concatenating. Remove later
+        new_channel_ids = recording.channel_ids[~np.in1d(recording.channel_ids, recording.channel_ids[badChannelList])]
+        recording = si.channelslice.ChannelSliceRecording(recording, new_channel_ids)
+
+    if doSaturationReplace:
+        windowsToSilenceArray = nullify_saturations(recording, local_probeFolder=local_probeFolder) # find saturations before any further processing. Only finds, doesn't correct.
+
+    if floatDataTypeForDriftCorrection:
+        if not (recording.dtype == 'float32'):
+            recording = recording.astype(dtype="float32")
+    if doSaturationReplace:
+        if windowsToSilenceArray.any():  # code breaks when no saturation
+            # if global_configs.useBugFixedSilencePeriods:
+            #     recording = silence_periods_file.silence_periods(recording, windowsToSilenceArray, mode=silenceOrNoiseReplace)
+            # else:
+            recording = si.silence_periods(recording, windowsToSilenceArray, mode=silenceOrNoiseReplace) # Doing this before whitening might cause issues... I need to understand how whitening works better.
+
+    return recording
 
 
 def spikeglx_preprocessing(recording,local_probeFolder=None,doSaturationReplace=False,silenceOrNoiseReplace='noise',floatDataTypeForDriftCorrection=False): ### not quite defunct because I use it for the sessionwise drift correction.
@@ -322,6 +351,7 @@ def nullify_saturations(recording,surrondingToAlsoNullify=100,local_probeFolder=
                windowsToSilenceArray = np.concatenate((windowsToSilenceArray[0:-1,:], [[(int(recording.sampling_frequency * 665)),recording.get_num_frames()]]))
 
             else:
+                windowsToSilenceArray = windowsToSilenceArray[windowsToSilenceArray[:,0] <= (int(recording.sampling_frequency * 665)),:] # removes the silent periods following this.
                 windowsToSilenceArray = np.concatenate((windowsToSilenceArray, [[(int(recording.sampling_frequency * 665)),recording.get_num_frames()]]))
         if topFolderString[0:19] == "05062024_PM_Challah":
             # ferret held in hand 60 seconds in the middle of the recording... should affect both probes. Might affect behavior. I'll assume at first there is no overlap with detected saturations because why would there be...

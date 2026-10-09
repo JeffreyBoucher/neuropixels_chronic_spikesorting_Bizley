@@ -11,13 +11,13 @@ def gatherSessionSetListForFerret(ferret):
     #### Comment out ones you want to ignore.
     if ferret == 'F2302_Challah':
         recordingZones = {
-                          'SessionSet01', ### first set, May 2024
-                          'SessionSet02', ### second set, June 2024
-                          'SessionSet03', ### third set, July 2024. Some PFC problems, not an overwhelming amount.
-                          'SessionSet04', #/# ### July into August. Pulse problems begin. If I want the good PFC data I need this dealt with. Or I need to figure out how to process the PFC data well. I have marked sets where I think the PFC data is tolerable but I have this issue with "##". There are four. So I have a lot of data to gain from it.
-                          'SessionSet05', #/# ### August into sept
-                          'SessionSet06', #/# ### sept into oct
-                          'SessionSet07', #/# NOTONNAS ### oct into nov. Also apparently this set isn't on the nas, should deal with that
+                          # 'SessionSet01', ### first set, May 2024
+                          # 'SessionSet02', ### second set, June 2024
+                          # 'SessionSet03', ### third set, July 2024. Some PFC problems, not an overwhelming amount.
+                          # 'SessionSet04', #/# ### July into August. Pulse problems begin. If I want the good PFC data I need this dealt with. Or I need to figure out how to process the PFC data well. I have marked sets where I think the PFC data is tolerable but I have this issue with "##". There are four. So I have a lot of data to gain from it.
+                          # 'SessionSet05', #/# ### August into sept
+                          # 'SessionSet06', #/# ### sept into oct
+                          # 'SessionSet07', #/# NOTONNAS ### oct into nov. Also apparently this set isn't on the nas, should deal with that
 
 
 
@@ -34,14 +34,14 @@ def gatherSessionSetListForFerret(ferret):
                           # 'SessionSet18',
                           # 'SessionSet19',
                           # 'SessionSet20', ### this is the final one, I think it is my pilot data with correlated/uncorrelated noise.
-
+                            'TestSet01', # a small test set. Just the first two days of recording.
                           }
     elif ferret == 'F2301_Boule':
         recordingZones = {
                           'SessionSet01',#/# ### First set Dec 2024. Pulse problems present
                           'SessionSet02',#/#
                           'SessionSet03',#/# ### Pulse problems solved in middle of this.
-                          # 'SessionSet04', ### intermittent freezes. Not sure how much this is or is not a problem.
+                          'SessionSet04', ### intermittent freezes. Not sure how much this is or is not a problem.
                           'SessionSet05', ### fully good apparently. Might potentially also include the april 28th 2025 week but that week has a saturating middle spout problem and honestly, there really is no dealing with that
                           'SessionSet06', ### another fully good week, June 2025
                           'SessionSet07', ### includes very short term headstage problem.

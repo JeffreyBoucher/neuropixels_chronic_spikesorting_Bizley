@@ -5,7 +5,7 @@ from pathlib import Path
 ###### Override variables; default to off unless you turn them on.
 
 SurveyOverride = False
-
+useBugFixedSilencePeriods = False
 ###### PERSONALIZATION ARGUMENTS ######
 projectLabel = 'Jeffrey' ## put your name or project or something to specify which sets of variables you will access.
 sessionString = '[0-9][0-9]*' # this is a default regular expression to get the correct filesets to analyze.
@@ -46,8 +46,8 @@ if projectLabel == 'Jeffrey': # contains probemap specific stuff. First set cont
     if recordingZone == 'Challah':
         ferret = 'F2302_Challah'
         ferret_no_id = 'Challah'
-        regionLabels = ['AC','PFC'] ### will be iterated through later.
-        # regionLabels = ['PFC'] ### will be iterated through later.
+        # regionLabels = ['AC','PFC'] ### will be iterated through later.
+        regionLabels = ['PFC'] ### will be iterated through later.
         sessionSetLabel = '' ### unused but needs to have a value
     elif recordingZone == 'Boule':
         ferret = 'F2301_Boule'

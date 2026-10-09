@@ -196,6 +196,22 @@ def SpecifySessionSetParameters(ferret,SessionSetName,BrainRegion):
                 pass
             elif BrainRegion == 'PFC':
                 pass
+        elif SessionSetName=='TestSet01':
+            ### first month of recording. Saturating signal on left (80% sure, maybe right) spout licks.#
+            ### otherwise recordings are good and I have used this as an investigation set.
+            ### simultaneous top AC and anterior (shank 0) PFC. 80% sure I have the direction correct re: shank 0.
+            SessionSetParams['DateStart'] = '13052024' ## day month year, to my chagrin. My plan will be I think to parse these strings in a very specific way, come up with a date range, and then generate a massive regex or something which allows for fitting to any of these...
+            SessionSetParams['DateEnd'] = '14052024'
+            if BrainRegion == 'AC':
+                SessionSetParams['sessionSetLabel'] = 'All_ACx_Top_groundref_' + SessionSetName # this will become the folder name for the output, and is also used to create the regular expression that identifies the sessions you want to include.
+                SessionSetParams['channel_map_to_use'] = 'Challah_top_b1_horizontal_band_ground.imro' # the name of the channel map. This is a more reliable way of identifying a probe/map, since we don't tend to use the same maps on multiple probes.
+                SessionSetParams['badChannelList'] = [66,105,149,170,175,209,210,239,354,369] # bad channels, manually found and labeled. These tend to be highly reliable from implant to end-of-experiment. They will be removed from all analyses.
+                pass
+            elif BrainRegion == 'PFC':
+                SessionSetParams['sessionSetLabel'] = 'PFC_shank0_' + SessionSetName # this will become the folder name for the output, and is also used to create the regular expression that identifies the sessions you want to include.
+                SessionSetParams['channel_map_to_use'] = 'Challah_top_PFC_shank0.imro' # the name of the channel map. This is a more reliable way of identifying a probe/map, since we don't tend to use the same maps on multiple probes.
+                SessionSetParams['badChannelList'] = [21,109,133,170,181,202,295,305,308,310,327,329,339] # bad channels, manually found and labeled. These tend to be highly reliable from implant to end-of-experiment. They will be removed from all analyses.
+                pass
     elif ferret == 'F2301_Boule':
         ##### FROM HERE ON PROBEMAPS NOT CHECKED
         if SessionSetName=='SessionSet01':

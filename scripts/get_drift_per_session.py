@@ -24,7 +24,7 @@ from neuropixels_chronic_spikesorting_Bizley.sessionSetManagement.getSessionsWit
 from generally_useful_functions_Bizley.getCorrectRecordingForRegion import getCorrectRecordingForRegion
 
 from neuropixels_chronic_spikesorting_Bizley.helpers.helpers_spikesorting_scripts import sort_np_sessions, get_channelmap_names
-from neuropixels_chronic_spikesorting_Bizley.spikesorting import spikesorting_pipeline, spikesorting_postprocessing, spikeglx_preprocessing
+from neuropixels_chronic_spikesorting_Bizley.spikesorting import spikesorting_pipeline, spikesorting_postprocessing, preprocessing_for_drift_correction
 from neuropixels_chronic_spikesorting_Bizley.helpers.npyx_metadata_fct import load_meta_file
 
 
@@ -32,9 +32,9 @@ from neuropixels_chronic_spikesorting_Bizley.helpers.npyx_metadata_fct import lo
 def main():
     if True: ### the following arguments are for debug
         pass
-        useLocalNotNAS = True ### I remember reading that results of drift correction are better for rawer data, but don't totally believe it. So I want to hedge. The thing they said was really bad for it was the whitening anyway. ### Drift correction stopped working and this is my best guess why, so I turned it back to False.
+        useLocalNotNAS = False ### I remember reading that results of drift correction are better for rawer data, but don't totally believe it. So I want to hedge. The thing they said was really bad for it was the whitening anyway. ### Drift correction stopped working and this is my best guess why, so I turned it back to False.
 
-    actuallyRunDriftCorrection = True
+    runDontLoadDriftCorrection = True # True to run drift correction, false to load and plot it.
 
 
     ### set up the big loop (through session sets)
@@ -67,11 +67,11 @@ def main():
             probeFolder = probeFolder[0]
             local_probeFolder = list(local_session.glob('*' + usedImro[:-3]))
             local_probeFolder = local_probeFolder[0]
-            if actuallyRunDriftCorrection:
+            if runDontLoadDriftCorrection:
                 # recording = si.read_cbin_ibl(probeFolder)  # for compressed
                 if not useLocalNotNAS:
                     recording = si.read_spikeglx(probeFolder, stream_id=usedImro) # for uncompressed
-                    recording = spikeglx_preprocessing(recording, doRemoveBadChannels=outerLoopConfigs.doRemoveBadChannels,skipStuffThatKSGUIDoes=outerLoopConfigs.skipStuffThatKSGUIDoes,local_probeFolder=local_probeFolder,badChannelList=sessionSetParams['badChannelList'],bin_s_sessionCat=outerLoopConfigs.bin_s_sessionCat,doSaturationReplace=outerLoopConfigs.doSaturationReplace,silenceOrNoiseReplace=outerLoopConfigs.silenceOrNoiseReplace_sessionwise,floatDataTypeForDriftCorrection=True)
+                    recording = preprocessing_for_drift_correction(recording, doRemoveBadChannels=outerLoopConfigs.doRemoveBadChannels,local_probeFolder=local_probeFolder,badChannelList=sessionSetParams['badChannelList'],doSaturationReplace=outerLoopConfigs.doSaturationReplace,silenceOrNoiseReplace=outerLoopConfigs.silenceOrNoiseReplace_sessionwise,floatDataTypeForDriftCorrection=True)
                 else:
                     recording = si.read_spikeglx(local_probeFolder, stream_id=usedImro) ### will have already been preprocessed if done properly!
                     if not (recording.dtype == 'float32'):
@@ -80,14 +80,14 @@ def main():
                     dict_of_recordings[sessionSet[1]].append(recording)
                 else:
                     dict_of_recordings[sessionSet[1]] = [recording]
-        if actuallyRunDriftCorrection:
+        if runDontLoadDriftCorrection:
             multirecordingInput = dict_of_recordings
 
         # motionMapFolder_used = all_VE_config.motionMapFolder / all_VE_config.ferret / all_VE_config.sessionSetLabel ### recently removed a redundant "spikesorted" from this folder chain.
 
         motionMapFolder_used = all_VE_config.local_neural_data / sessionSet[0] / sessionSet[1] / sessionSet[2] / 'motionMapFolder'
         uncalibratedSamplingRate = 30000 ### named as such so that it is noticable. Want to deal with this soon. Probably doesn't actually matter even a little for this application, though.
-        if actuallyRunDriftCorrection: # loading and processing are pretty well split this time, the result of the load will be in a different format. Plotting will be load-relegated, drift saving will be here (maybe later, both)
+        if runDontLoadDriftCorrection: # loading and processing are pretty well split this time, the result of the load will be in a different format. Plotting will be load-relegated, drift saving will be here (maybe later, both)
         ### first split shanks.
             for ixi,currentRecording in enumerate(multirecordingInput[sessionSet[1]]): ### malheurusement I need to do my shank splitting on each session pre-concatenation... I can either do that here or earlier... But it actually is not so big a deal to just do it here, let's do it here.
                 if not ixi: # initialize on first loop.
@@ -243,36 +243,36 @@ def main():
                 motion = pickleJar["motion"]
                 peak_locations_after = pickleJar["peak_locations_after"]
 
-                if outerLoopConfigs.checkMotionPlotsOnline:
-                    scatterArray = np.zeros((len(peak_locations), 3))
-                    xLocationToCheckShank = np.zeros((len(peak_locations), 1))
-                    for iiii in range(0, len(peak_locations)):
-                        scatterArray[iiii, 0] = peaks[iiii][0]
 
-                        scatterArray[iiii, 1] = peak_locations[iiii][1]
-                        scatterArray[iiii, 2] = peak_locations_after[iiii][1]
-                        xLocationToCheckShank[iiii] = peak_locations[iiii][0]
-                    plt.figure()
-                    plt.scatter([1, 2, 3], [2, 4, 3])  # for some reason this helps the other figures load...
-                    plt.show()
-                    plt.figure()
-                    plt.scatter(scatterArray[:, 0] / 30000, scatterArray[:, 1], s=0.0005, c="black")
-                    plt.gca().invert_yaxis()
-                    plt.show()
-                    plt.figure()
-                    plt.scatter(scatterArray[:, 0] / 30000, scatterArray[:, 2], s=0.0005, c="black")
-                    plt.gca().invert_yaxis()
-                    plt.show()
-                    plt.figure()
-                    plt.hist(xLocationToCheckShank,100) # for some reason this helps the other figures load...
-                    plt.show()
+                scatterArray = np.zeros((len(peak_locations), 3))
+                xLocationToCheckShank = np.zeros((len(peak_locations), 1))
+                for iiii in range(0, len(peak_locations)): # dear lord I hope there is a better way to handle this. It is extremely slow. Maybe some kind of reshape?
+                    scatterArray[iiii, 0] = peaks[iiii][0]
 
-                    plt.figure()
-                    plt.scatter([1, 2, 3], [2, 4, 3])  # for some reason this helps the other figures load...
-                    plt.show()
+                    scatterArray[iiii, 1] = peak_locations[iiii][1]
+                    scatterArray[iiii, 2] = peak_locations_after[iiii][1]
+                    xLocationToCheckShank[iiii] = peak_locations[iiii][0]
+                plt.figure()
+                plt.scatter([1, 2, 3], [2, 4, 3])  # for some reason this helps the other figures load...
+                plt.show()
+                plt.figure()
+                plt.scatter(scatterArray[:, 0] / 30000, scatterArray[:, 1], s=0.0005, c="black")
+                plt.gca().invert_yaxis()
+                plt.show()
+                plt.figure()
+                plt.scatter(scatterArray[:, 0] / 30000, scatterArray[:, 2], s=0.0005, c="black")
+                plt.gca().invert_yaxis()
+                plt.show()
+                plt.figure()
+                plt.hist(xLocationToCheckShank,100)
+                plt.show()
+
+                plt.figure()
+                plt.scatter([1, 2, 3], [2, 4, 3])  # for some reason this helps the other figures load...
+                plt.show()
 
 
-                    breakPointSpot = "here"
+                breakPointSpot = "here"
 
 
 

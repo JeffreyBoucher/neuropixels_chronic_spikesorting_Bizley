@@ -27,7 +27,7 @@ if all_VE_config.plottingArguments == 'JeffreyRecommended':
 
 if all_VE_config.generalSpikesortingArguments == 'JeffreyRecommended':
     ### these should really not be here, they should be above get_drift_per_session.
-    desired_n_jobs = 16 # this is where you can set up parallel processing. -1 for all available cores. Sometimes some code breaks when you try to parallel process; you can set to 1 to bypass those problems in exchange for things running slow.
+    desired_n_jobs = 1 #16 # this is where you can set up parallel processing. -1 for all available cores. Sometimes some code breaks when you try to parallel process; you can set to 1 to bypass those problems in exchange for things running slow.
     si.set_global_job_kwargs(n_jobs=desired_n_jobs)
     doRemoveBadChannels = 1  # currently uses the manual list... I doubt you'll ever want to turn this off.
     skipStuffThatKSGUIDoes = 1  # this variable is fundamentally outdated at this point and will either be irrelevant if you see this, or deleted if you don't.

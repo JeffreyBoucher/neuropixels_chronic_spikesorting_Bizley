@@ -1,3 +1,5 @@
+# I am fundamentally not actually using this and don't know why it is still here.
+
 from pathlib import Path
 
 #behaviouralDataPath = Path('Y:/Data/Behaviour/Ferret')
