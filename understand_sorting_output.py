@@ -4,6 +4,8 @@
 # can or cannot be done with the sortings output. So: pre-phy, and potentially
 # excluding useful spikesorting analyses which don't involve the sorting output.
 
+# Author: Jeffrey Boucher, 2026
+
 
 from pathlib import Path
 
